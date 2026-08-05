@@ -26,6 +26,11 @@ as_app() { sudo -u "$SERVICE_USER" env SPORTSCRAWL_ENV_FILE="$ENV_FILE" "$@"; }
 
 [ -f "$ENV_FILE" ] || fail "$ENV_FILE is missing"
 
+# Everything below imports the sportscrawl package, so the working directory
+# has to be the app. Run from root's home, sudo inherits that cwd and every
+# import fails with ModuleNotFoundError.
+cd "$APP_DIR"
+
 # A CR anywhere in the env file ends up inside the value. That is not
 # hypothetical: it once sent the whole team roster into a database file named
 # "sportscrawl.db\r" while the app read an empty "sportscrawl.db" beside it,
@@ -71,7 +76,7 @@ print(open_database(settings()["DATABASE_PATH"]).execute(
 ')
 if [ "$TEAMS" -eq 0 ]; then
     echo "no teams, seeding rosters and crests"
-    (cd "$APP_DIR" && as_app "$PY" seed_teams.py)
+    as_app "$PY" seed_teams.py
 else
     echo "teams already seeded: $TEAMS"
 fi
