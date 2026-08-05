@@ -6,6 +6,9 @@
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#1B2A4A">
   <title>{% block title %}Sportscrawl{% endblock %}</title>
+  {# The .ico carries 16, 32 and 48px; the PNG is the modern path. Both are
+     the supplied artwork, not generated from the square mark. #}
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32"
         href="{{ url_for('static', filename='img/favicon-32.png') }}">
   <link rel="apple-touch-icon"

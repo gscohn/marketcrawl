@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from flask import (
     Flask,
     Response,
+    send_from_directory,
     abort,
     g,
     redirect,
@@ -324,6 +325,17 @@ def create_app(database_path=None, config=None):
 
         floor = int(config.get("ADMIN_MIN_BUCKET") or stats.MIN_BUCKET)
         return render_template("admin.html", data=stats.summary(db(), floor=floor))
+
+    @app.route("/favicon.ico")
+    def favicon():
+        """Browsers probe this path whatever the link tags say, and Apache
+        proxies everything except /static/ here, so without a route it is a
+        404 in the log on every first visit."""
+        return send_from_directory(
+            os.path.join(app.root_path, "static", "img"),
+            "favicon.ico",
+            mimetype="image/vnd.microsoft.icon",
+        )
 
     @app.route("/privacy")
     def privacy():

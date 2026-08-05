@@ -344,3 +344,12 @@ def test_the_navbar_uses_the_brand_navy_not_bootstrap_dark(env):
     page = app.test_client().get("/privacy").data.decode("utf-8")
     assert "sc-navbar" in page
     assert "bg-dark" not in page
+
+
+def test_the_root_favicon_path_is_served(env):
+    """Browsers probe /favicon.ico whatever the link tags say, and Apache
+    proxies everything except /static/ to the app."""
+    app, _, _ = env
+    reply = app.test_client().get("/favicon.ico")
+    assert reply.status_code == 200
+    assert reply.data[:4] == b"\x00\x00\x01\x00"  # ICO magic number
