@@ -8,6 +8,7 @@ a network. The poller does the sending.
 
 from __future__ import annotations
 
+import logging
 import re
 import secrets
 from datetime import datetime, timedelta
@@ -21,6 +22,8 @@ HELP_THROTTLE = timedelta(hours=1)
 # `stop` is the opt-out path and must work when everything else is broken, so
 # it is matched first and accepts synonyms. Spec section 9.
 STOP_WORDS = frozenset({"stop", "unsubscribe", "quit", "cancel", "off"})
+
+log = logging.getLogger("sportscrawl.commands")
 
 PUNCTUATION = re.compile(r"[^\w\s]")
 WHITESPACE = re.compile(r"\s+")
@@ -107,12 +110,28 @@ class CommandHandler:
             return NUDGE % link
         return HELP % link
 
+    @staticmethod
+    def _match_name(text: str) -> str:
+        if text in ("delete confirm", "confirm delete", "confirm"):
+            return "delete_confirm"
+        if text in STOP_WORDS:
+            return "stop"
+        if text in ("start", "delete", "config", "privacy", "admin"):
+            return text
+        return "unknown"
+
     # -- dispatch ---------------------------------------------------------
 
     def handle(self, message, now: datetime) -> str:
         did = message.sender_did
         convo_id = message.convo_id
         text = normalize(message.text)
+
+        # The privacy policy promises inbound DMs are processed for commands
+        # and not retained. This is the line that has to keep that true: the
+        # DID and the matched command, never the message body. `unknown`
+        # covers everything unmatched, so no user text reaches a log file.
+        log.info("command did=%s matched=%s", did, self._match_name(text))
 
         # Any inbound message from an unknown DID creates the subscriber
         # before the command is dispatched. Inert until the config page is

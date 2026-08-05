@@ -1,6 +1,98 @@
 {% extends "base.html" %}
 {% block title %}Sportscrawl privacy{% endblock %}
+
 {% block content %}
-<h1 class="h4">Privacy</h1>
-<p class="text-body-secondary">Placeholder. Written in full in build step 6, per spec section 12.</p>
+<h1 class="h3">Privacy</h1>
+<p class="text-body-secondary">
+  Sportscrawl is a Bluesky bot that sends one direct message a day with scores
+  for the teams you follow. This page says exactly what it stores and what it
+  does not. Last updated 5 August 2026.
+</p>
+
+<h2 class="h5 mt-4">What is stored</h2>
+<ul>
+  <li>Your <strong>DID</strong> — the permanent account identifier Bluesky gives
+    you. Never your handle, because handles change and DIDs do not.</li>
+  <li>Your <strong>timezone</strong> and <strong>delivery time</strong>.</li>
+  <li>Your <strong>team and competition selections</strong>.</li>
+  <li><strong>Timestamps</strong>: when you signed up, when you last received a
+    digest, when you last paused.</li>
+  <li>A <strong>Bluesky conversation id</strong> and the id of the last message
+    processed in it, so the same command is never run twice.</li>
+</ul>
+<p>Nothing else. No email address, no name, no location beyond the timezone you
+  chose from a dropdown, no analytics scripts, no advertising identifiers.</p>
+
+<h2 class="h5 mt-4">You are not anonymous</h2>
+<p>
+  A DID resolves to a public Bluesky handle and profile. Anyone with the
+  database could look up who a subscriber is. Sportscrawl does not pretend
+  otherwise: you are identifiable, and the real protection is that the database
+  sits on a private server and is never shared.
+</p>
+
+<h2 class="h5 mt-4">Your messages</h2>
+<p>
+  Direct messages you send the bot are read to find a command —
+  <code>stop</code>, <code>config</code>, <code>delete</code> and so on — and are
+  not retained. What gets written to the server log is your DID and which command
+  matched. The text of your message is never logged, including when it matches
+  nothing.
+</p>
+<p class="text-body-secondary">
+  Bluesky direct messages are <strong>not end-to-end encrypted</strong>. Bluesky
+  can see their contents, and so can anyone with access to their systems. That is
+  true of every DM you send anyone on Bluesky, not just this bot, but it is worth
+  knowing before you send anything you would not want read.
+</p>
+
+<h2 class="h5 mt-4">Stopping and deleting</h2>
+<p>
+  <strong><code>stop</code></strong> pauses your messages and keeps your
+  settings, so <code>start</code> picks up where you left off.
+</p>
+<p>
+  <strong><code>delete</code></strong> removes everything the account record
+  holds: your DID, timezone, delivery time, selections, timestamps, and any
+  settings links. It asks for confirmation first and cannot be undone.
+</p>
+<p>
+  One thing survives, and it should be stated plainly. A counter of the form
+  <em>"someone signed up on this date"</em> and <em>"someone deleted on this
+  date"</em> is kept afterwards. It carries a one-way hash of your DID rather
+  than the DID itself, it is only ever read as a total, and it exists so the
+  project can tell whether people are finding it useful. It is
+  <strong>pseudonymous, not anonymous</strong>: whoever holds both the database
+  and the secret key could re-link it, so calling it anonymous would be a
+  stretch.
+</p>
+<p>
+  Your <strong>conversation history stays in your Bluesky inbox</strong> after
+  deletion. The message thread is not this application's to delete. You can
+  delete the conversation yourself from your Bluesky client.
+</p>
+
+<h2 class="h5 mt-4">Who else sees your data</h2>
+<p>
+  Nobody. There is no third-party sharing, no analytics provider, and no
+  advertising. Scores come from ESPN, and the server fetches them once for
+  everyone: <strong>ESPN sees this server, not you</strong>. The team crests and
+  stylesheet on this site are served from this domain rather than a CDN, so
+  loading this page does not tell anyone else that you visited it.
+</p>
+
+<h2 class="h5 mt-4">This is a personal project</h2>
+<p>
+  Sportscrawl is run by one person as an experiment. There is no company behind
+  it, no uptime guarantee, and no promise it will keep running. If it stops, it
+  stops. The data source is unofficial and could disappear without notice, in
+  which case the project ends rather than taking on a paid replacement.
+</p>
+
+<h2 class="h5 mt-4">Contact</h2>
+<p>
+  <a href="mailto:michael@pusateri.org">michael@pusateri.org</a> — deliberately
+  not the bot's DM inbox, so you can ask a question without messaging the thing
+  you may be trying to leave.
+</p>
 {% endblock %}

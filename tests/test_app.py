@@ -186,3 +186,38 @@ def test_security_headers_are_present(env):
     # sees the server, not the users.
     assert "default-src 'self'" in reply.headers["Content-Security-Policy"]
     assert "img-src 'self'" in reply.headers["Content-Security-Policy"]
+
+
+# --------------------------------------------------------------------------
+# Privacy policy, spec section 12
+# --------------------------------------------------------------------------
+
+
+def test_the_privacy_page_makes_every_required_disclosure(env):
+    """Each of these is a claim section 12 requires. A policy that drifts from
+    the code is worse than none, so the page is asserted rather than trusted."""
+    app, _, _ = env
+    page = app.test_client().get("/privacy").data.decode("utf-8")
+
+    required = [
+        "DID",                      # what is stored
+        "timezone",
+        "conversation id",          # the transport bookkeeping
+        "not anonymous",            # a DID resolves to a public profile
+        "not retained",             # inbound DMs
+        "never logged",             # message bodies
+        "not end-to-end encrypted", # Bluesky can read DMs
+        "pseudonymous",             # the surviving counter, named honestly
+        "stays in your Bluesky inbox",
+        "ESPN sees this server, not you",
+        "no uptime guarantee",
+        "michael@pusateri.org",     # contact that is not the DM inbox
+    ]
+    missing = [claim for claim in required if claim not in page]
+    assert missing == [], "privacy page is missing: %s" % missing
+
+
+def test_the_privacy_page_needs_no_session(env):
+    """It is linked from the help message, which strangers get first."""
+    app, _, _ = env
+    assert app.test_client().get("/privacy").status_code == 200
