@@ -445,10 +445,15 @@ One rule, deterministic, covering every case:
 
 1. If exactly one competitor is a team the subscriber follows, that team goes
    first. Seeing `Dodgers 3, Padres 6` reads as a loss instantly.
-2. Otherwise, for a final, the winner goes first. This is the case that covers
-   competition subscriptions.
-3. A draw with no followed team, or both competitors followed, puts the home
-   team first.
+2. If **both** competitors are followed, the home team goes first. Neither
+   perspective wins, so venue is the neutral tiebreak.
+3. Otherwise, for a final with a winner, the winner goes first. This is the
+   case that covers competition subscriptions.
+4. Otherwise — a draw, or nothing decided yet — the home team goes first.
+
+Test them in that order. Rules 2 and 3 both match a subscriber who follows both
+teams in a finished game, and rule 2 has to win or a fan of both Bay Area teams
+gets winner-first ordering.
 
 For scheduled games the subscriber's team keeps first position and takes `vs`
 when home, `at` when away, per Output format below. With no followed team the
