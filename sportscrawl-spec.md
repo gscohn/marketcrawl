@@ -589,6 +589,26 @@ notification preview carries it.
 for byte identical, newlines intact. The transport preserves them; the entire
 format depends on it and it holds.
 
+### Links must carry facets
+
+**Bluesky renders links from facets, not by parsing the text.** A message sent
+with a bare URL and no facets displays as inert text that cannot be tapped.
+Verified 2026-08-04 the hard way, by sending one.
+
+This is a launch blocker for the help response in section 9, whose entire job
+is handing a stranger the config link. Without facets someone gets help and
+still cannot pick teams.
+
+Attach an `app.bsky.richtext.facet#link` for every URL in every outbound
+message, in the transport rather than at each call site, so no message type can
+forget. Do not rely on client-side auto-detection: a URL without a TLD is not
+linkified at all.
+
+Facet offsets are **UTF-8 byte** indices, not character indices. A digest
+containing `CF Montréal` ahead of a link shifts every later offset by one and
+silently produces a link over the wrong range — a bug that would only ever
+appear for teams with accented names.
+
 ### Empty digest
 
 If a subscriber has no games on a given day, send nothing. This is not

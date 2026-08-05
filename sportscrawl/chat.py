@@ -10,12 +10,50 @@ what the atproto-proxy header does. Without it the calls 404.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from .http import CONNECT_TIMEOUT, READ_TIMEOUT, USER_AGENT, FetchError
 
 PLC_DIRECTORY = "https://plc.directory"
 CHAT_PROXY = "did:web:api.bsky.chat#bsky_chat"
+
+
+URL_PATTERN = re.compile(r"https?://[^\s<>\"]+[^\s<>\".,;:!?)\]]")
+
+
+def link_facets(text: str) -> list:
+    """Mark every URL in the message as a clickable link.
+
+    Bluesky renders links from facets, not by parsing the text. Without them a
+    URL is inert grey text the subscriber has to copy by hand, and the help
+    message in section 9 exists to hand someone the config link.
+
+    Auto-detection is not something to rely on: a bare `http://192.168.4.24:5000/...`
+    is not linkified at all, and that is precisely the shape of a link with no
+    TLD. Sending explicit facets removes the guesswork.
+
+    Offsets are UTF-8 BYTE indices, not character indices. A digest containing
+    "CF Montreal" with an accent would shift every subsequent link by one and
+    silently produce a link over the wrong range.
+    """
+    encoded = text.encode("utf-8")
+    facets = []
+    for match in URL_PATTERN.finditer(text):
+        uri = match.group(0)
+        byte_start = len(text[: match.start()].encode("utf-8"))
+        facets.append(
+            {
+                "index": {
+                    "byteStart": byte_start,
+                    "byteEnd": byte_start + len(uri.encode("utf-8")),
+                },
+                "features": [
+                    {"$type": "app.bsky.richtext.facet#link", "uri": uri}
+                ],
+            }
+        )
+    return facets
 
 
 @dataclass(frozen=True)
@@ -131,10 +169,14 @@ class ChatClient:
         return self._call("GET", "chat.bsky.convo.getMessages", params=params)
 
     def send_message(self, convo_id: str, text: str) -> dict:
+        message = {"text": text}
+        facets = link_facets(text)
+        if facets:
+            message["facets"] = facets
         return self._call(
             "POST",
             "chat.bsky.convo.sendMessage",
-            payload={"convoId": convo_id, "message": {"text": text}},
+            payload={"convoId": convo_id, "message": message},
         )
 
     def update_read(self, convo_id: str, message_id=None) -> dict:

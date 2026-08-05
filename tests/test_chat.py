@@ -6,6 +6,7 @@ import pytest
 
 from sportscrawl.chat import (
     CHAT_PROXY,
+    link_facets,
     ChatClient,
     Unauthorized,
     parse_messages,
@@ -134,3 +135,50 @@ def test_deleted_messages_are_skipped_not_treated_as_empty_commands():
     ]}
     messages = parse_messages(payload, "c1")
     assert [m.message_id for m in messages] == ["m2"]
+
+
+# --------------------------------------------------------------------------
+# Link facets
+# --------------------------------------------------------------------------
+
+
+def test_a_url_gets_a_link_facet():
+    """Bluesky renders links from facets, not by parsing text. Without one the
+    config link in the help message is inert and onboarding dead-ends."""
+    facets = link_facets("Settings: https://sportscrawl.app/c/abc")
+    assert len(facets) == 1
+    assert facets[0]["features"][0]["uri"] == "https://sportscrawl.app/c/abc"
+    assert facets[0]["features"][0]["$type"] == "app.bsky.richtext.facet#link"
+
+
+def test_facet_offsets_are_utf8_bytes_not_characters():
+    """An accented team name ahead of the link shifts every later offset."""
+    text = "CF Montréal won. See https://sportscrawl.app/c/xyz"
+    facet = link_facets(text)[0]
+    encoded = text.encode("utf-8")
+    covered = encoded[facet["index"]["byteStart"]:facet["index"]["byteEnd"]]
+    assert covered.decode("utf-8") == "https://sportscrawl.app/c/xyz"
+
+
+def test_a_url_without_a_tld_still_gets_a_facet():
+    """A bare host:port is exactly what client auto-detection misses."""
+    facets = link_facets("Open http://192.168.4.24:5000/c/abc on your phone")
+    assert facets[0]["features"][0]["uri"] == "http://192.168.4.24:5000/c/abc"
+
+
+def test_trailing_punctuation_is_not_part_of_the_link():
+    facets = link_facets("See https://sportscrawl.app/privacy.")
+    assert facets[0]["features"][0]["uri"] == "https://sportscrawl.app/privacy"
+
+
+def test_a_message_without_urls_sends_no_facets():
+    transport = FakeTransport({"createSession": SESSION, "sendMessage": {"id": "m1"}})
+    client(transport).send_message("c1", "Tue Aug 4\n\nFinal\nDodgers 6, Padres 3")
+    assert "facets" not in transport.calls[-1]["payload"]["message"]
+
+
+def test_send_message_attaches_facets_automatically():
+    transport = FakeTransport({"createSession": SESSION, "sendMessage": {"id": "m1"}})
+    client(transport).send_message("c1", "Pick teams: https://sportscrawl.app/c/k9")
+    message = transport.calls[-1]["payload"]["message"]
+    assert message["facets"][0]["features"][0]["uri"] == "https://sportscrawl.app/c/k9"
