@@ -970,6 +970,18 @@ slug is more than **14 days** old and the slug is not in a failure state, close
 every subscription to it, send one message per affected subscriber, and drop
 the rows.
 
+**Not yet implemented, and the rule above is not sufficient as written.**
+Absence cannot distinguish *"this tournament has finished"* from *"this
+tournament has not started yet"*. The 2027 Women's World Cup (`fifa.wwc`)
+returns zero events today and will keep doing so for months; a subscription
+taken now would be auto-closed a fortnight later with a message announcing the
+competition had ended, ten months before the first match.
+
+A competition must therefore only be closable once it has **ever** returned an
+event to us — `last_event_date IS NOT NULL` — which is the cheap version of the
+distinction. Anything that has never produced a match is a future tournament,
+not a finished one. See TODO.md.
+
 Fourteen days is long enough to survive an international break or a gap between
 group and knockout stages, and the check must be skipped entirely while
 `consecutive_failures` is non-zero. Otherwise a fortnight of ESPN trouble
