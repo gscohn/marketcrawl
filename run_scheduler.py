@@ -21,6 +21,7 @@ from sportscrawl.config import require, settings
 from sportscrawl.db import open_database
 from sportscrawl.scheduler import Scheduler, stdout_sender
 from sportscrawl.source import SOCCER_LEAGUES_AT_LAUNCH, US_PRO_LEAGUES, EspnSource
+from sportscrawl.watchdog import Liveness
 
 TICK_SECONDS = 60
 
@@ -89,12 +90,18 @@ def main(argv=None) -> int:
 
     scheduler = build(args.database, pepper, sender=sender)
 
+    live = Liveness("scheduler")
+    if not args.once:
+        live.start_watchdog()
+
     # Server timezone must be UTC and every conversion is explicit against the
     # subscriber's stored zone. Never rely on server local time. Spec section 3.
     while True:
         report = scheduler.tick(datetime.now(timezone.utc))
-        if report.sent or report.failures or report.expired:
-            print("[%s] %s" % (datetime.now(timezone.utc).strftime("%H:%M:%S"), report))
+        if report.sent or report.failures or report.expired or report.errors:
+            print("[%s] %s" % (datetime.now(timezone.utc).strftime("%H:%M:%S"), report),
+                  flush=True)
+        live.tick()
         if args.once:
             return 0
         time.sleep(TICK_SECONDS)

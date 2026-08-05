@@ -20,6 +20,7 @@ from sportscrawl.commands import CommandHandler
 from sportscrawl.config import require, settings
 from sportscrawl.db import open_database
 from sportscrawl.poller import Poller
+from sportscrawl.watchdog import Liveness
 
 POLL_SECONDS = 20
 
@@ -48,10 +49,16 @@ def main(argv=None) -> int:
                              admin_did=config.get("ADMIN_DID"))
     poller = Poller(db, client, handler, bot_did=bot_did)
 
+    live = Liveness("poller")
+    if not args.once:
+        live.start_watchdog()
+
     while True:
         report = poller.poll(datetime.now(timezone.utc))
         if report.handled:
-            print("[%s] %s" % (datetime.now(timezone.utc).strftime("%H:%M:%S"), report))
+            print("[%s] %s" % (datetime.now(timezone.utc).strftime("%H:%M:%S"), report),
+                  flush=True)
+        live.tick()
         if args.once:
             return 0
         time.sleep(POLL_SECONDS)
