@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
   <meta name="theme-color" content="#1B2A4A">
-  <title>{% block title %}Sportscrawl{% endblock %}</title>
+  <title>{% block title %}SportsCrawl{% endblock %}</title>
   {# The .ico carries 16, 32 and 48px; the PNG is the modern path. Both are
      the supplied artwork, not generated from the square mark. #}
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" sizes="any">
@@ -28,7 +28,7 @@
          itself, so the logo's circle sits on it without a seam. #}
       <span class="navbar-brand p-0 m-0">
         <img src="{{ url_for('static', filename='img/wordmark-navbar.png') }}"
-             alt="Sportscrawl" height="32">
+             alt="SportsCrawl" height="32">
       </span>
       <span class="navbar-text small text-white-50">{% block navnote %}{% endblock %}</span>
     </div>

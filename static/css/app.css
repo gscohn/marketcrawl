@@ -24,3 +24,8 @@ body { font-family: system-ui, -apple-system, sans-serif; }
 .league > summary::-webkit-details-marker { display: none; }
 .league > summary::before { content: "\25B8"; margin-right: .5rem; color: var(--bs-secondary-color); }
 .league[open] > summary::before { content: "\25BE"; }
+
+/* The sample DM sits in a box sized to the message rather than the column,
+   so it reads like a message rather than a page section. */
+.sc-sample { display: inline-block; max-width: 100%; }
+.sc-sample pre { overflow-x: auto; }

@@ -38,7 +38,7 @@ def normalize(text: str) -> str:
     return WHITESPACE.sub(" ", cleaned).strip()
 
 
-HELP = """Sportscrawl sends you a daily score digest
+HELP = """SportsCrawl sends you a daily score digest
 for the teams you follow.
 
 Pick teams and set your delivery time:

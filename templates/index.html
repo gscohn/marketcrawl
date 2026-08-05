@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Sportscrawl, a daily score digest by DM{% endblock %}
+{% block title %}SportsCrawl, a daily score digest by DM{% endblock %}
 
 {% block robots %}{% endblock %}
 
@@ -20,10 +20,9 @@
       Nothing else: no feed, no notifications, no app to install.
     </p>
 
-    <div class="card my-4">
-      <div class="card-body">
-        <h2 class="h6 text-body-secondary mb-3">This is the whole product</h2>
-        <pre class="mb-0 p-3 rounded" style="background: var(--sc-navy); color: var(--sc-cream); font-size: .95rem; white-space: pre-wrap;">Wed Aug 5
+    <h2 class="h6 text-body-secondary mt-4 mb-2">Sample DM</h2>
+    <div class="sc-sample mb-4">
+      <pre class="mb-0 p-3 rounded" style="background: var(--sc-navy); color: var(--sc-cream); font-size: .95rem; white-space: pre;">Wed Aug 5
 
 Final
 &#9918; Dodgers 1, Cubs 5
@@ -32,7 +31,6 @@ Final
 Today
 &#9917; LAFC at Austin FC 5:30p
 &#127944; Kings vs Oilers 7:30p</pre>
-      </div>
     </div>
 
     <h2 class="h4 mt-5">How to start</h2>
@@ -66,7 +64,7 @@ Today
     </p>
 
     <p class="text-body-secondary mt-5">
-      Sportscrawl is a personal project with no company behind it and no uptime
+      SportsCrawl is a personal project with no company behind it and no uptime
       guarantee. It stores your Bluesky account id, your timezone, your
       delivery time and your team choices, and nothing else. The
       <a href="{{ url_for('privacy') }}">privacy policy</a> says exactly what
