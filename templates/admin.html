@@ -3,7 +3,7 @@
 {% block navnote %}admin{% endblock %}
 
 {% macro cell(value) -%}
-  {%- if value is none %}<span class="text-body-secondary" title="fewer than {{ data.floor }}">&mdash;</span>{% else %}{{ value }}{% endif -%}
+  {%- if value is none %}<span class="text-body-secondary" title="fewer than {{ data.floor }}">n/a</span>{% else %}{{ value }}{% endif -%}
 {%- endmacro %}
 
 {% block content %}
@@ -11,7 +11,7 @@
 <p class="text-body-secondary small">
   Aggregates only. There is no subscriber list, by design: if the page cannot
   show individual rows, the privacy claim stays true without relying on
-  discipline. Buckets smaller than {{ data.floor }} show as &mdash; rather than
+  discipline. Buckets smaller than {{ data.floor }} show as n/a rather than
   identifying someone by arithmetic. For one subscriber's digest, use the CLI.
 </p>
 
@@ -56,9 +56,9 @@
   <dt class="col-sm-5">Paused</dt><dd class="col-sm-7">{{ data.stops.paused }}</dd>
   <dt class="col-sm-5">Deleted</dt><dd class="col-sm-7">{{ data.stops.deleted }}</dd>
   <dt class="col-sm-5">Stop rate</dt>
-  <dd class="col-sm-7">{% if data.stops.stop_rate is none %}&mdash;{% else %}{{ data.stops.stop_rate }}%{% endif %}</dd>
+  <dd class="col-sm-7">{% if data.stops.stop_rate is none %}n/a{% else %}{{ data.stops.stop_rate }}%{% endif %}</dd>
   <dt class="col-sm-5">Median days to stop</dt>
-  <dd class="col-sm-7">{% if data.stops.median_days_to_stop is none %}&mdash;{% else %}{{ data.stops.median_days_to_stop }}{% endif %}</dd>
+  <dd class="col-sm-7">{% if data.stops.median_days_to_stop is none %}n/a{% else %}{{ data.stops.median_days_to_stop }}{% endif %}</dd>
 </dl>
 
 <h2 class="h5 mt-4">Config page</h2>
@@ -123,8 +123,8 @@
   {% for row in data.health %}
     <tr>
       <td>{{ row.league }}</td>
-      <td class="small">{{ row.last_success_at or '&mdash;' | safe }}</td>
-      <td class="small">{{ row.last_event_date or '&mdash;' | safe }}</td>
+      <td class="small">{{ row.last_success_at or 'n/a' }}</td>
+      <td class="small">{{ row.last_event_date or 'n/a' }}</td>
       <td>{% if row.consecutive_failures %}<span class="badge text-bg-danger">{{ row.consecutive_failures }}</span>{% else %}0{% endif %}</td>
     </tr>
   {% else %}

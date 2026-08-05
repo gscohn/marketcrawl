@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
+  {% block nav %}
   <nav class="navbar sc-navbar">
     <div class="container">
       {# The reversed wordmark: white "Sports", orange "Crawl", built for a
@@ -32,6 +33,7 @@
       <span class="navbar-text small text-white-50">{% block navnote %}{% endblock %}</span>
     </div>
   </nav>
+  {% endblock %}
   <div class="container my-4">
     {% block content %}{% endblock %}
   </div>

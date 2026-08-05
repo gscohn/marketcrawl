@@ -1,13 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Sportscrawl — a daily score digest by DM{% endblock %}
+{% block title %}Sportscrawl, a daily score digest by DM{% endblock %}
 
 {% block robots %}{% endblock %}
+
+{# The front page leads with the full wordmark and logo rather than the small
+   navbar mark. It is the only page a stranger sees before deciding. #}
+{% block nav %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-lg-8">
 
-    <h1 class="h2 mb-3">One DM a day with your teams' scores.</h1>
+    <img src="{{ url_for('static', filename='img/sportscrawl-wordmark-horizontal.png') }}"
+         alt="SportsCrawl" class="img-fluid mb-4" style="max-width: 460px;">
+
+    <h1 class="h2 mb-3">
+      One DM a day<br>
+      with your teams' scores.
+    </h1>
     <p class="lead text-body-secondary">
       Last night's finals and today's games, for the teams you follow. Nothing
       else: no feed, no notifications, no app to install.
@@ -32,7 +42,7 @@ Today
     <ol class="mt-3">
       <li class="mb-2">
         Send a direct message to
-        <strong>@sportscrawl.app</strong> on Bluesky. Anything will do —
+        <strong>@sportscrawl.app</strong> on Bluesky. Anything will do, so
         <code>hello</code> is fine.
       </li>
       <li class="mb-2">
@@ -61,7 +71,7 @@ Today
     <p class="text-body-secondary mt-5">
       Sportscrawl is a personal project with no company behind it and no uptime
       guarantee. It stores your Bluesky account id, your timezone, your
-      delivery time and your team choices — nothing else. The
+      delivery time and your team choices, and nothing else. The
       <a href="{{ url_for('privacy') }}">privacy policy</a> says exactly what
       that means.
     </p>

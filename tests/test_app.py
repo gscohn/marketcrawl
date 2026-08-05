@@ -391,3 +391,30 @@ def test_capability_and_operator_routes_stay_noindex(env):
     for path in ("/settings", "/admin", "/c/whatever"):
         reply = client.get(path)
         assert "noindex" in reply.headers.get("X-Robots-Tag", ""), path
+
+
+def test_no_em_dashes_in_any_rendered_page(env):
+    """A house style rule, asserted so it does not drift back in."""
+    app, db, now = env
+    client = app.test_client()
+    client.get("/c/%s" % mint(db, now, scope="admin"))
+
+    for path in ("/", "/privacy", "/admin"):
+        page = client.get(path).data.decode("utf-8")
+        assert "—" not in page, "em dash in %s" % path
+        assert "&mdash;" not in page, "mdash entity in %s" % path
+
+    settings_client = app.test_client()
+    settings_client.get("/c/%s" % mint(db, now))
+    page = settings_client.get("/settings").data.decode("utf-8")
+    assert "—" not in page and "&mdash;" not in page
+
+
+def test_the_front_page_leads_with_the_full_wordmark(env):
+    """The only page a stranger sees before deciding, so it gets the logo and
+    wordmark rather than the small navbar mark."""
+    app, _, _ = env
+    page = app.test_client().get("/").data.decode("utf-8")
+    assert "sportscrawl-wordmark-horizontal.png" in page
+    assert "sc-navbar" not in page          # navbar suppressed here
+    assert "wordmark-navbar.png" not in page
