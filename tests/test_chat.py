@@ -25,8 +25,10 @@ class FakeTransport:
     def __call__(self, method, url, headers, payload, params=None):
         self.calls.append({"method": method, "url": url, "headers": headers,
                            "payload": payload, "params": params})
-        nsid = url.rsplit("/", 1)[-1]
-        reply = self.responses.get(nsid, {})
+        # Match on a suffix of the URL: the last path segment is the full nsid
+        # ("com.atproto.server.createSession"), not the bare method name.
+        key = next((k for k in self.responses if url.endswith(k)), None)
+        reply = self.responses.get(key, {})
         if isinstance(reply, list):
             reply = reply.pop(0) if reply else {}
         if isinstance(reply, Exception):
