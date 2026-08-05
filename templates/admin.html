@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Sportscrawl admin{% endblock %}
+{% block navnote %}admin{% endblock %}
+
+{% macro cell(value) -%}
+  {%- if value is none %}<span class="text-body-secondary" title="fewer than {{ data.floor }}">&mdash;</span>{% else %}{{ value }}{% endif -%}
+{%- endmacro %}
+
+{% block content %}
+<h1 class="h4">Admin</h1>
+<p class="text-body-secondary small">
+  Aggregates only. There is no subscriber list, by design: if the page cannot
+  show individual rows, the privacy claim stays true without relying on
+  discipline. Buckets smaller than {{ data.floor }} show as &mdash; rather than
+  identifying someone by arithmetic. For one subscriber's digest, use the CLI.
+</p>
+
+<div class="row g-3 mb-4">
+  {% for label, value, note in [
+      ('Active', data.states.active, 'receiving digests'),
+      ('Paused', data.states.paused, 'stopped, settings kept'),
+      ('Deleted', data.states.deleted, 'gone; only events remember')] %}
+  <div class="col-6 col-md-4">
+    <div class="card h-100"><div class="card-body">
+      <div class="text-body-secondary small">{{ label }}</div>
+      <div class="display-6">{{ value }}</div>
+      <div class="text-body-secondary small">{{ note }}</div>
+    </div></div>
+  </div>
+  {% endfor %}
+</div>
+<p class="text-body-secondary small">
+  Paused and deleted are tracked separately on purpose. Paused suggests
+  seasonal quiet, deleted suggests churn, and that distinction is the metric
+  this project exists to gather.
+</p>
+
+<h2 class="h5 mt-4">Retention</h2>
+<table class="table table-sm">
+  <thead><tr><th>Window</th><th>Cohort</th><th>Still here</th><th>Rate</th></tr></thead>
+  <tbody>
+  {% for r in data.retention %}
+    <tr>
+      <td>{{ r.days }} days</td>
+      <td>{{ r.cohort }}</td>
+      <td>{{ r.retained }}</td>
+      <td>{% if r.pct is none %}<span class="text-body-secondary">no cohort yet</span>{% else %}{{ r.pct }}%{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="h5 mt-4">Stopping</h2>
+<dl class="row">
+  <dt class="col-sm-5">Signups, all time</dt><dd class="col-sm-7">{{ data.stops.signups }}</dd>
+  <dt class="col-sm-5">Paused</dt><dd class="col-sm-7">{{ data.stops.paused }}</dd>
+  <dt class="col-sm-5">Deleted</dt><dd class="col-sm-7">{{ data.stops.deleted }}</dd>
+  <dt class="col-sm-5">Stop rate</dt>
+  <dd class="col-sm-7">{% if data.stops.stop_rate is none %}&mdash;{% else %}{{ data.stops.stop_rate }}%{% endif %}</dd>
+  <dt class="col-sm-5">Median days to stop</dt>
+  <dd class="col-sm-7">{% if data.stops.median_days_to_stop is none %}&mdash;{% else %}{{ data.stops.median_days_to_stop }}{% endif %}</dd>
+</dl>
+
+<h2 class="h5 mt-4">Config page</h2>
+<dl class="row">
+  <dt class="col-sm-5">Loads</dt><dd class="col-sm-7">{{ data.config.loads }}</dd>
+  <dt class="col-sm-5">Saves</dt><dd class="col-sm-7">{{ data.config.saves }}</dd>
+  <dt class="col-sm-5">Returning visitors</dt><dd class="col-sm-7">{{ data.config.returning }}</dd>
+</dl>
+
+<h2 class="h5 mt-4">Selections by league</h2>
+<table class="table table-sm">
+  <thead><tr><th>League</th><th>Subscribers</th></tr></thead>
+  <tbody>
+  {% for row in data.leagues %}
+    <tr><td>{{ row.league }}</td><td>{{ cell(row.count) }}</td></tr>
+  {% else %}
+    <tr><td colspan="2" class="text-body-secondary">No selections yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="h5 mt-4">Most followed teams</h2>
+<table class="table table-sm">
+  <thead><tr><th>Team</th><th>League</th><th>Subscribers</th></tr></thead>
+  <tbody>
+  {% for row in data.teams %}
+    <tr><td>{{ row.name }}</td><td class="text-body-secondary small">{{ row.league }}</td><td>{{ cell(row.count) }}</td></tr>
+  {% else %}
+    <tr><td colspan="3" class="text-body-secondary">No selections yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="h5 mt-4">Delivery times</h2>
+<table class="table table-sm">
+  <thead><tr><th>Time</th><th>Subscribers</th></tr></thead>
+  <tbody>
+  {% for row in data.delivery %}
+    <tr><td>{{ row.time }}</td><td>{{ cell(row.count) }}</td></tr>
+  {% else %}
+    <tr><td colspan="2" class="text-body-secondary">Nobody has set a timezone yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="h5 mt-4">Signups over time</h2>
+<table class="table table-sm">
+  <thead><tr><th>Day</th><th>Joined</th><th>Left</th><th>Running total</th></tr></thead>
+  <tbody>
+  {% for row in data.timeline %}
+    <tr><td>{{ row.day }}</td><td>{{ row.joined }}</td><td>{{ row.left }}</td><td>{{ row.total }}</td></tr>
+  {% else %}
+    <tr><td colspan="4" class="text-body-secondary">Nothing yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="h5 mt-4">Data source health</h2>
+<table class="table table-sm">
+  <thead><tr><th>League</th><th>Last success</th><th>Last event</th><th>Failures</th></tr></thead>
+  <tbody>
+  {% for row in data.health %}
+    <tr>
+      <td>{{ row.league }}</td>
+      <td class="small">{{ row.last_success_at or '&mdash;' | safe }}</td>
+      <td class="small">{{ row.last_event_date or '&mdash;' | safe }}</td>
+      <td>{% if row.consecutive_failures %}<span class="badge text-bg-danger">{{ row.consecutive_failures }}</span>{% else %}0{% endif %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4" class="text-body-secondary">No fetches recorded yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

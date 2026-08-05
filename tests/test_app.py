@@ -221,3 +221,83 @@ def test_the_privacy_page_needs_no_session(env):
     """It is linked from the help message, which strangers get first."""
     app, _, _ = env
     assert app.test_client().get("/privacy").status_code == 200
+
+
+# --------------------------------------------------------------------------
+# Admin page, spec section 11
+# --------------------------------------------------------------------------
+
+
+def admin_session(app, db, now):
+    token = mint(db, now, scope="admin")
+    client = app.test_client()
+    client.get("/c/%s" % token)
+    return client
+
+
+def test_admin_requires_authentication(env):
+    app, _, _ = env
+    reply = app.test_client().get("/admin")
+    assert reply.status_code == 401
+    assert "Basic" in reply.headers.get("WWW-Authenticate", "")
+
+
+def test_a_config_session_cannot_reach_admin(env):
+    """The scope check has to hold on every handler, not just at exchange."""
+    app, db, now = env
+    client = app.test_client()
+    client.get("/c/%s" % mint(db, now, scope="config"))
+    assert client.get("/admin").status_code == 401
+
+
+def test_an_admin_session_opens_the_page(env):
+    app, db, now = env
+    reply = admin_session(app, db, now).get("/admin")
+    assert reply.status_code == 200
+    assert b"Aggregates only" in reply.data
+
+
+def test_basic_auth_works_when_the_dm_path_is_down(env):
+    """The DM link shares a process with the scheduler. If that is wedged, it
+    is exactly the morning the dashboard is worth opening."""
+    import base64
+
+    path = str(env[0].config["DATABASE_PATH"])
+    app = create_app(path, {"FLASK_SECRET_KEY": "t", "EVENTS_PEPPER": PEPPER,
+                            "ADMIN_PASSWORD": "hunter2", "DATABASE_PATH": path})
+    app.config["SESSION_COOKIE_SECURE"] = False
+    header = base64.b64encode(b"admin:hunter2").decode()
+    reply = app.test_client().get("/admin", headers={"Authorization": "Basic %s" % header})
+    assert reply.status_code == 200
+
+
+def test_a_wrong_password_is_refused(env):
+    import base64
+
+    path = str(env[0].config["DATABASE_PATH"])
+    app = create_app(path, {"FLASK_SECRET_KEY": "t", "EVENTS_PEPPER": PEPPER,
+                            "ADMIN_PASSWORD": "hunter2", "DATABASE_PATH": path})
+    header = base64.b64encode(b"admin:wrong").decode()
+    reply = app.test_client().get("/admin", headers={"Authorization": "Basic %s" % header})
+    assert reply.status_code == 401
+
+
+def test_the_admin_page_never_renders_a_did(env):
+    """No subscriber list view. If the page cannot show individual rows, the
+    privacy claim stays true without relying on discipline."""
+    app, db, now = env
+    repo.add_sub(db, DID, "team", "baseball/mlb", "19")
+    page = admin_session(app, db, now).get("/admin").data.decode("utf-8")
+    assert DID not in page
+    assert "did:plc:" not in page
+
+
+def test_small_buckets_are_suppressed(env):
+    """A cell reading 1 next to a team nobody else follows identifies a person
+    by arithmetic."""
+    app, db, now = env
+    repo.add_sub(db, DID, "team", "baseball/mlb", "19")
+    page = admin_session(app, db, now).get("/admin").data.decode("utf-8")
+
+    assert "Dodgers" in page          # the row exists
+    assert "fewer than 5" in page     # but the count is withheld

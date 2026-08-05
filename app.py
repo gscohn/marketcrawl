@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import (
     Flask,
+    Response,
     abort,
     g,
     redirect,
@@ -22,7 +23,7 @@ from flask import (
     url_for,
 )
 
-from sportscrawl import repo
+from sportscrawl import repo, stats
 from sportscrawl.config import settings
 from sportscrawl.db import open_database
 
@@ -275,6 +276,47 @@ def create_app(database_path=None, config=None):
             raise
 
         return redirect(url_for("config_page", saved=1))
+
+    # -- admin ------------------------------------------------------------
+
+    def admin_ok():
+        """Two paths, deliberately. Spec section 11.
+
+        The DM link is the one that works from a phone; basic auth is the one
+        that works when the poller is wedged, which is exactly the morning the
+        dashboard is worth opening.
+        """
+        sid = session.get("sid")
+        if sid:
+            row = db().execute(
+                "SELECT scope, expires_at FROM sessions WHERE sid = ?", (sid,)
+            ).fetchone()
+            if (
+                row is not None
+                and row["scope"] == "admin"
+                and row["expires_at"] >= repo.utc_string(datetime.now(timezone.utc))
+            ):
+                return True
+
+        secret = config.get("ADMIN_PASSWORD")
+        auth = request.authorization
+        if secret and auth and auth.password and secrets.compare_digest(
+            auth.password, secret
+        ):
+            return True
+        return False
+
+    @app.route("/admin")
+    def admin():
+        if not admin_ok():
+            # Ask for basic auth rather than 403: the password path has to be
+            # reachable when the DM path is down.
+            return Response(
+                "", 401, {"WWW-Authenticate": 'Basic realm="sportscrawl"'}
+            )
+
+        floor = int(config.get("ADMIN_MIN_BUCKET") or stats.MIN_BUCKET)
+        return render_template("admin.html", data=stats.summary(db(), floor=floor))
 
     @app.route("/privacy")
     def privacy():

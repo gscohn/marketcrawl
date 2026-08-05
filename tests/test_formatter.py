@@ -17,7 +17,6 @@ import pytest
 from sportscrawl.espn import ParseError, load_fixture, parse_scoreboard
 from sportscrawl.formatter import (
     FAILURE_NOTICE,
-    HANDLE,
     MAX_MESSAGE,
     MISSING_DATA_LINE,
     format_digest,
@@ -114,7 +113,7 @@ def test_league_has_games_but_none_are_followed():
 # --------------------------------------------------------------------------
 
 
-def test_single_final_renders_header_section_and_attribution():
+def test_single_final_renders_header_and_section():
     events = [
         game(
             start=datetime(2026, 8, 4, 2, 10, tzinfo=timezone.utc),  # Aug 3, 7:10p PT
@@ -137,10 +136,29 @@ def test_single_final_renders_header_section_and_attribution():
             "",
             "Final",
             "\N{BASEBALL} Dodgers 6, Padres 3",
-            "",
-            HANDLE,
         ]
     )
+
+
+def test_the_digest_carries_no_attribution_line():
+    """The message already arrives from @sportscrawl.app in a thread with the
+    bot. Repeating the handle in the body told the reader nothing."""
+    events = [
+        game(
+            start=datetime(2026, 8, 4, 2, 10, tzinfo=timezone.utc),
+            state="post",
+            home=team("100", "Dodgers"),
+            away=team("200", "Padres"),
+            home_score=6,
+            away_score=3,
+            winner="home",
+        )
+    ]
+    result = format_digest(
+        events, [Sub("team", MLB, "100")], PACIFIC, at_local(PACIFIC, 2026, 8, 4, 7)
+    )
+    assert "@sportscrawl.app" not in result.text
+    assert result.text.endswith("Padres 3")
 
 
 def test_scheduled_game_uses_vs_at_and_local_clock():
@@ -538,7 +556,6 @@ def test_overflow_drops_lines_by_priority_and_reports_a_count(monkeypatch):
     assert len(result.text) <= 220
     assert "more" in result.text
     assert events[0].home.name in result.text  # the followed final survived
-    assert result.text.endswith(HANDLE)
 
 
 # --------------------------------------------------------------------------

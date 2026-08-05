@@ -13,7 +13,11 @@ from zoneinfo import ZoneInfo
 
 from .models import Digest, Event, Sub
 
-HANDLE = "@sportscrawl.app"
+# No attribution line. The message already arrives from @sportscrawl.app in a
+# thread with the bot, so repeating the handle in the body told the reader
+# nothing they could not see. Spec section 6 originally called for one on the
+# grounds that screenshots are the only organic discovery channel; the cost of
+# a redundant line in every message every day outweighed that.
 
 # Verified 2026-08-04 against the live API, not guessed: sendMessage rejects
 # anything longer with
@@ -265,7 +269,7 @@ def format_digest(
     failed = subscribed & set(failed_leagues)
     if failed == subscribed:
         # Nothing to attach a digest to.
-        return Digest(text=FAILURE_NOTICE + "\n\n" + HANDLE, kind="failure")
+        return Digest(text=FAILURE_NOTICE, kind="failure")
 
     usable = [event for event in events if event.league not in failed]
     lines = _build_lines(usable, subs, zone, today)
@@ -274,10 +278,10 @@ def format_digest(
         # No games is not an error and gets no message. An NFL-only subscriber
         # would otherwise hear "no games today" for seven months.
         if failed:
-            return Digest(text=FAILURE_NOTICE + "\n\n" + HANDLE, kind="failure")
+            return Digest(text=FAILURE_NOTICE, kind="failure")
         return Digest(text=None, kind="silent")
 
-    trailer = [MISSING_DATA_LINE, HANDLE] if failed else [HANDLE]
+    trailer = [MISSING_DATA_LINE] if failed else []
     return Digest(
         text=_fit(lines, today, trailer),
         kind="partial" if failed else "digest",

@@ -633,8 +633,17 @@ from section 7.
 
 ### Attribution line
 
-Include the bot handle at the bottom of the digest. Screenshots are the only
-organic discovery channel this project has.
+**Removed 2026-08-05, after seeing it in a real thread.**
+
+The original reasoning was that screenshots are the only organic discovery
+channel this project has, so the digest should carry the handle. In practice
+the message arrives *from* `@sportscrawl.app`, in a conversation with the bot,
+with the handle already on screen directly above it. The line told the reader
+nothing they could not see, and it cost two lines of a 1000-grapheme budget in
+every message, every day, forever.
+
+Screenshots still show the sender. The discovery argument survives; the extra
+line was not what carried it.
 
 ## 7. Scheduler and delivery
 
