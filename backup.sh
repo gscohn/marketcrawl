@@ -26,7 +26,12 @@ STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 TARGET="$BACKUP_DIR/sportscrawl-$STAMP.db"
 
 mkdir -p "$BACKUP_DIR"
-chmod 700 "$BACKUP_DIR"
+# 750 with group sportscrawl, NOT 700. The scbackup account pulls these over
+# ssh and is in that group; 700 here locks it out. This ran as 700 once and
+# broke the pull on the very next snapshot, silently, because the first pull
+# had already succeeded against a directory chmodded by hand.
+chgrp sportscrawl "$BACKUP_DIR" 2>/dev/null || true
+chmod 750 "$BACKUP_DIR"
 cd "$APP_DIR"
 
 SPORTSCRAWL_ENV_FILE="$ENV_FILE" "$PY" - "$TARGET" <<'PYTHON'
@@ -67,6 +72,9 @@ print("  teams       %d" % teams)
 PYTHON
 
 gzip -f "$TARGET"
+# Group readable for the pull account, never world readable: these contain
+# every subscriber's DID.
+chmod 640 "$TARGET.gz"
 echo "  wrote       $TARGET.gz ($(stat -c %s "$TARGET.gz") bytes)"
 
 # Prune old snapshots. The NAS keeps its own copies for longer; this is only
