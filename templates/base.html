@@ -4,7 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#1B2A4A">
   <title>{% block title %}Sportscrawl{% endblock %}</title>
+  <link rel="icon" type="image/png" sizes="32x32"
+        href="{{ url_for('static', filename='img/favicon-32.png') }}">
+  <link rel="apple-touch-icon"
+        href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
   {# Vendored, not a CDN. Section 12 promises no third parties, and a CDN
      request hands the visitor's IP to one on the page that configures their
      subscription. #}
@@ -12,10 +17,16 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
-  <nav class="navbar navbar-dark bg-dark">
+  <nav class="navbar sc-navbar">
     <div class="container">
-      <span class="navbar-brand fw-bold">&#127936; Sportscrawl</span>
-      <span class="navbar-text small">{% block navnote %}{% endblock %}</span>
+      {# The reversed wordmark: white "Sports", orange "Crawl", built for a
+         dark background. The navbar colour is the navy from the artwork
+         itself, so the logo's circle sits on it without a seam. #}
+      <span class="navbar-brand p-0 m-0">
+        <img src="{{ url_for('static', filename='img/wordmark-navbar.png') }}"
+             alt="Sportscrawl" height="32">
+      </span>
+      <span class="navbar-text small text-white-50">{% block navnote %}{% endblock %}</span>
     </div>
   </nav>
   <div class="container my-4">

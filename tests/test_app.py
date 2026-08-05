@@ -322,3 +322,25 @@ def test_a_config_token_still_lands_on_settings(env):
     app, db, now = env
     reply = app.test_client().get("/c/%s" % mint(db, now, scope="config"))
     assert reply.headers["Location"].endswith("/settings")
+
+
+def test_the_brand_assets_are_referenced_and_present(env):
+    """The logo and favicon are gitignore-adjacent to static/vendor, which was
+    excluded once and shipped an unstyled page."""
+    import os
+
+    app, _, _ = env
+    page = app.test_client().get("/privacy").data.decode("utf-8")
+
+    for asset in ("img/wordmark-navbar.png", "img/favicon-32.png",
+                  "img/apple-touch-icon.png"):
+        assert asset in page, "%s not referenced in the page" % asset
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", asset)
+        assert os.path.exists(path), "%s referenced but missing on disk" % asset
+
+
+def test_the_navbar_uses_the_brand_navy_not_bootstrap_dark(env):
+    app, _, _ = env
+    page = app.test_client().get("/privacy").data.decode("utf-8")
+    assert "sc-navbar" in page
+    assert "bg-dark" not in page
