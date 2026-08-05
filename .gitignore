@@ -1,0 +1,12 @@
+# Nothing secret or stateful goes in the repo. Spec section 13.
+.env
+*.db
+*.db-wal
+*.db-shm
+__pycache__/
+.venv/
+instance/
+
+# scratch
+*.pyc
+.pytest_cache/
