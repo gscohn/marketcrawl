@@ -161,6 +161,27 @@ def test_scheduled_game_uses_vs_at_and_local_clock():
     assert "\N{BASKETBALL AND HOOP} Lakers vs Nuggets 7:30p" in result.text
 
 
+def test_no_followed_team_uses_vs_with_the_home_side_first():
+    """`at` asserts a venue, and competition slates are full of neutral sites
+    where that assertion is false. `vs` is never wrong."""
+    events = [
+        game(
+            league=WORLD_CUP,
+            start=at_local(PACIFIC, 2026, 8, 4, 16, 0).astimezone(timezone.utc),
+            home=team("100", "Dream"),
+            away=team("200", "Mercury"),
+        )
+    ]
+    result = format_digest(
+        events,
+        [Sub("competition", WORLD_CUP)],
+        PACIFIC,
+        at_local(PACIFIC, 2026, 8, 4, 7),
+    )
+    assert "Dream vs Mercury 4:00p" in result.text
+    assert " at " not in result.text
+
+
 def test_away_team_takes_at():
     events = [
         game(

@@ -471,8 +471,21 @@ teams in a finished game, and rule 2 has to win or a fan of both Bay Area teams
 gets winner-first ordering.
 
 For scheduled games the subscriber's team keeps first position and takes `vs`
-when home, `at` when away, per Output format below. With no followed team the
-away side leads: `Galaxy at Austin FC`.
+when home, `at` when away, per Output format below.
+
+With **no** followed team, the home side leads and takes `vs`: `Dream vs
+Mercury`, not `Mercury at Dream`. An earlier draft of this section said the
+opposite, and the reason to settle on `vs` is that it is never wrong.
+
+`at` asserts a venue. Competition slates are exactly where no team is followed,
+and tournament matches are routinely played at neutral sites, where `France at
+Brazil` falsely says Brazil is hosting. ESPN's `neutralSite` flag cannot rescue
+this: it is present and `false` on MLB events but **absent entirely on soccer**,
+including every World Cup fixture checked — missing precisely where it would
+matter. `vs` claims nothing about venue and reads correctly either way.
+
+So `at` appears only when a subscriber's own team is involved, which is both
+where the perspective earns its keep and where neutral sites are rarest.
 
 This resolves an ambiguity in the original draft: the stated requirement that
 home and away be distinguishable applies to **scheduled** games only. A final
