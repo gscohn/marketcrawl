@@ -283,6 +283,8 @@ def create_app(database_path=None, config=None):
             repo.record_event(
                 db(), now, "config_save", did, config.get("EVENTS_PEPPER", "dev")
             )
+            # The scheduler sends the confirmation; see repo.queue_confirmation.
+            repo.queue_confirmation(db(), did, now)
             db().execute("COMMIT")
         except Exception:
             db().execute("ROLLBACK")

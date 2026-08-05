@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from . import repo
+from .confirm import confirmation_text
 from .formatter import format_digest
 
 # How late a digest may be delivered. Spec section 7.
@@ -59,12 +60,14 @@ class TickReport:
     expired: int = 0
     deferred: int = 0
     errors: int = 0
+    confirmations: int = 0
 
     def __str__(self) -> str:
         return (
             "sent=%d failures=%d silent=%d expired=%d deferred=%d errors=%d"
+            " confirmations=%d"
             % (self.sent, self.failures, self.silent, self.expired,
-               self.deferred, self.errors)
+               self.deferred, self.errors, self.confirmations)
         )
 
 
@@ -123,6 +126,7 @@ class Scheduler:
 
     def tick(self, now: datetime) -> TickReport:
         report = TickReport()
+        self._send_confirmations(now, report)
         rows = repo.deliverable_subscribers(self._db)
 
         due = []
@@ -160,6 +164,33 @@ class Scheduler:
             self._sleep(self._gap)
 
         return report
+
+    def _send_confirmations(self, now, report) -> None:
+        """Tell someone their settings took, and when to expect the first
+        digest. Drained here rather than sent by the web process."""
+        for row in repo.pending_confirmations(self._db):
+            try:
+                subs = repo.subs_for(self._db, row["did"])
+                teams = sum(1 for sub in subs if sub.kind == "team")
+                competitions = sum(1 for sub in subs if sub.kind == "competition")
+                local_today = now.astimezone(ZoneInfo(row["tz"])).date().isoformat()
+
+                text = confirmation_text(
+                    row["send_time"],
+                    row["tz"],
+                    teams,
+                    competitions,
+                    now,
+                    already_sent_today=row["last_sent_date"] == local_today,
+                )
+                self._send(row["did"], text)
+                # Cleared only after the send succeeds, so a transport failure
+                # retries on the next tick instead of losing the message.
+                repo.clear_confirmation(self._db, row["did"])
+                report.confirmations += 1
+            except Exception as exc:
+                report.errors += 1
+                print("confirmation failed for %s: %s" % (row["did"], exc), flush=True)
 
     def _deliver(self, candidate, window, now, report) -> None:
         # Re-check immediately before sending. A delete landing mid-cycle must

@@ -439,3 +439,68 @@ def test_league_health_is_persisted(db):
     row = repo.get_league_state(db, MLB)
     assert row["consecutive_failures"] == 0
     assert row["last_success_at"] == "2026-08-04T14:00:00Z"
+
+
+# --------------------------------------------------------------------------
+# Save confirmations
+# --------------------------------------------------------------------------
+
+
+def test_a_queued_confirmation_is_sent_by_the_scheduler(db):
+    """The web process queues it; delivery stays with the scheduler."""
+    add_subscriber(db, send_time="05:30")
+    repo.add_sub(db, DID, "team", MLB, "100")
+    repo.queue_confirmation(db, DID, utc(2026, 8, 4, 21, 0))
+
+    sender = Recorder()
+    scheduler(db, FakeSource(), sender).tick(utc(2026, 8, 4, 21, 0))
+
+    assert len(sender.sent) == 1
+    assert "Settings saved." in sender.sent[0][1]
+    assert repo.get_subscriber(db, DID)["confirm_pending_at"] is None
+
+
+def test_a_confirmation_is_sent_once(db):
+    add_subscriber(db)
+    repo.add_sub(db, DID, "team", MLB, "100")
+    repo.queue_confirmation(db, DID, utc(2026, 8, 4, 21, 0))
+
+    sender = Recorder()
+    engine = scheduler(db, FakeSource(), sender)
+    engine.tick(utc(2026, 8, 4, 21, 0))
+    engine.tick(utc(2026, 8, 4, 21, 1))
+
+    assert len(sender.sent) == 1
+
+
+def test_a_failed_confirmation_is_retried_not_lost(db):
+    """Cleared only after the send succeeds."""
+    add_subscriber(db)
+    repo.add_sub(db, DID, "team", MLB, "100")
+    repo.queue_confirmation(db, DID, utc(2026, 8, 4, 21, 0))
+
+    failing = Recorder(fail_after=0)
+    report = scheduler(db, FakeSource(), failing).tick(utc(2026, 8, 4, 21, 0))
+    assert report.errors == 1
+    assert repo.get_subscriber(db, DID)["confirm_pending_at"] is not None
+
+    working = Recorder()
+    scheduler(db, FakeSource(), working).tick(utc(2026, 8, 4, 21, 5))
+    assert len(working.sent) == 1
+
+
+def test_a_confirmation_does_not_block_the_digest_batch(db):
+    """One broken confirmation must not cost everyone their digest."""
+    add_subscriber(db, did="did:plc:confirm")
+    add_subscriber(db, did="did:plc:digest")
+    repo.add_sub(db, "did:plc:digest", "team", MLB, "100")
+    repo.queue_confirmation(db, "did:plc:confirm", utc(2026, 8, 4, 14, 0))
+    db.execute("UPDATE subscribers SET tz = NULL WHERE did = 'did:plc:confirm'")
+
+    sender = Recorder()
+    report = scheduler(db, FakeSource(events=[final()]), sender).tick(
+        utc(2026, 8, 4, 14, 0)
+    )
+
+    assert report.errors == 1                      # the confirmation failed
+    assert any(did == "did:plc:digest" for did, _ in sender.sent)

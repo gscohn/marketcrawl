@@ -261,3 +261,31 @@ def set_state(connection, did, state, when, pepper):
     )
     record_event(connection, when, "pause" if state == "paused" else "resume", did, pepper)
     return True
+
+
+# -- save confirmations ---------------------------------------------------
+
+
+def queue_confirmation(connection, did, when):
+    """Flag set by the web process, drained by the scheduler.
+
+    The web process does not send: gunicorn runs several workers, a chat login
+    per request is slow, and delivery belongs to the scheduler, which already
+    owns the sender, the allowlist and per-subscriber error isolation.
+    """
+    connection.execute(
+        "UPDATE subscribers SET confirm_pending_at = ? WHERE did = ?",
+        (utc_string(when), did),
+    )
+
+
+def pending_confirmations(connection):
+    return connection.execute(
+        "SELECT * FROM subscribers WHERE confirm_pending_at IS NOT NULL"
+    ).fetchall()
+
+
+def clear_confirmation(connection, did):
+    connection.execute(
+        "UPDATE subscribers SET confirm_pending_at = NULL WHERE did = ?", (did,)
+    )

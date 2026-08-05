@@ -58,7 +58,14 @@ def migrate(connection: sqlite3.Connection, migrations_dir=None) -> list:
         # written IF NOT EXISTS and must be safe to run twice (spec section
         # 13). A script that dies halfway leaves its version unrecorded, so
         # the next deploy re-runs it and finishes the job.
-        connection.executescript(path.read_text(encoding="utf-8"))
+        try:
+            connection.executescript(path.read_text(encoding="utf-8"))
+        except sqlite3.OperationalError as exc:
+            # SQLite has no ADD COLUMN IF NOT EXISTS. A migration that only
+            # adds a column is still safe to run twice, so a duplicate column
+            # is treated as already applied rather than a failure.
+            if "duplicate column name" not in str(exc):
+                raise
         connection.execute(
             "INSERT INTO schema_version (version, applied_at)"
             " VALUES (?, datetime('now'))",
