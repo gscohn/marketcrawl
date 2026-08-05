@@ -10,5 +10,10 @@ instance/
 # scratch
 *.pyc
 .pytest_cache/
+# Crests are refetchable and bulky (205 files); seed_teams.py downloads them.
 static/crests/
-static/vendor/
+
+# Bootstrap is NOT ignored. It is a single pinned file the page cannot render
+# without, and leaving it out of the repo shipped an unstyled page to
+# production. Vendored deliberately rather than loaded from a CDN: section 12
+# promises no third parties.
