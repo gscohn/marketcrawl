@@ -5,11 +5,6 @@ design; this is what has not been built or decided yet.
 
 ## Before testers
 
-- [ ] **Separate Bluesky app password for the server.** Production currently
-      shares the one on straylight, so revoking either takes down the other and
-      Bluesky gives no way to tell them apart. Two minutes in Settings →
-      Privacy and Security → App Passwords, with DM access ticked, then swap it
-      into `/home/sportscrawl/.env` and restart.
 - [ ] **Watch one clean send.** The first unattended run stalled silently; the
       heartbeat and watchdog went in afterwards but have not yet proven
       themselves through a morning. Next fire is 05:30 America/Los_Angeles.
