@@ -108,7 +108,8 @@ def main(argv=None) -> int:
     # subscriber's stored zone. Never rely on server local time. Spec section 3.
     while True:
         report = scheduler.tick(datetime.now(timezone.utc))
-        if report.sent or report.failures or report.expired or report.errors:
+        if (report.sent or report.failures or report.expired
+                or report.errors or report.confirmations):
             print("[%s] %s" % (datetime.now(timezone.utc).strftime("%H:%M:%S"), report),
                   flush=True)
         live.tick()
