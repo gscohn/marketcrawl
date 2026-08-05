@@ -151,3 +151,113 @@ def get_league_state(connection, league):
     return connection.execute(
         "SELECT * FROM league_state WHERE league = ?", (league,)
     ).fetchone()
+
+
+# -- conversation state ---------------------------------------------------
+#
+# Keyed by conversation and holding no DID, so it survives `delete`. A
+# returning subscriber's old messages must not replay as fresh commands.
+
+
+def get_convo_state(connection, convo_id):
+    return connection.execute(
+        "SELECT * FROM convo_state WHERE convo_id = ?", (convo_id,)
+    ).fetchone()
+
+
+def ensure_convo(connection, convo_id):
+    connection.execute(
+        "INSERT OR IGNORE INTO convo_state (convo_id) VALUES (?)", (convo_id,)
+    )
+
+
+def set_last_message(connection, convo_id, message_id):
+    ensure_convo(connection, convo_id)
+    connection.execute(
+        "UPDATE convo_state SET last_message_id = ? WHERE convo_id = ?",
+        (message_id, convo_id),
+    )
+
+
+def last_message_id(connection, convo_id):
+    row = get_convo_state(connection, convo_id)
+    return row["last_message_id"] if row else None
+
+
+def set_help_sent(connection, convo_id, when):
+    ensure_convo(connection, convo_id)
+    connection.execute(
+        "UPDATE convo_state SET last_help_at = ? WHERE convo_id = ?",
+        (utc_string(when), convo_id),
+    )
+
+
+def help_sent_at(connection, convo_id):
+    row = get_convo_state(connection, convo_id)
+    return row["last_help_at"] if row else None
+
+
+def set_delete_pending(connection, convo_id, until):
+    ensure_convo(connection, convo_id)
+    connection.execute(
+        "UPDATE convo_state SET delete_pending_until = ? WHERE convo_id = ?",
+        (utc_string(until) if until else None, convo_id),
+    )
+
+
+def delete_pending_until(connection, convo_id):
+    row = get_convo_state(connection, convo_id)
+    return row["delete_pending_until"] if row else None
+
+
+# -- tokens ---------------------------------------------------------------
+
+
+def issue_token(connection, did, token, scope, expires_at):
+    """A fresh token invalidates every earlier one for that DID.
+
+    Spec section 9: `config` issues a fresh link and kills the previous.
+    """
+    connection.execute(
+        "DELETE FROM config_tokens WHERE did = ? AND scope = ?", (did, scope)
+    )
+    connection.execute(
+        "INSERT INTO config_tokens (token, did, scope, expires_at) VALUES (?, ?, ?, ?)",
+        (token, did, scope, utc_string(expires_at)),
+    )
+
+
+# -- deletion -------------------------------------------------------------
+
+
+def delete_subscriber(connection, did, when, pepper):
+    """Everything the account record holds, in one transaction.
+
+    convo_state is deliberately untouched: it carries no DID, and dropping it
+    would reset the poll cursor so old messages replay as new commands.
+    """
+    connection.execute("BEGIN")
+    try:
+        record_event(connection, when, "delete", did, pepper)
+        connection.execute("DELETE FROM sessions WHERE did = ?", (did,))
+        connection.execute("DELETE FROM config_tokens WHERE did = ?", (did,))
+        connection.execute("DELETE FROM subs WHERE did = ?", (did,))
+        connection.execute("DELETE FROM subscribers WHERE did = ?", (did,))
+        connection.execute("COMMIT")
+    except Exception:
+        connection.execute("ROLLBACK")
+        raise
+
+
+def set_state(connection, did, state, when, pepper):
+    """Idempotent: re-running `stop` on a paused subscriber changes nothing
+    and writes no second event."""
+    row = get_subscriber(connection, did)
+    if row is None or row["state"] == state:
+        return False
+    connection.execute(
+        "UPDATE subscribers SET state = ?, paused_at = ? WHERE did = ?",
+        (state, utc_string(when) if state == "paused" else None, did),
+    )
+    record_event(connection, when, "pause" if state == "paused" else "resume", did, pepper)
+    return True
