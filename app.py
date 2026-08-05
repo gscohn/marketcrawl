@@ -117,10 +117,15 @@ def create_app(database_path=None, config=None):
         if connection is not None:
             connection.close()
 
+    # The landing page and the privacy policy are meant to be found. Everything
+    # else either carries a capability token or belongs to the operator.
+    PUBLIC_ENDPOINTS = {"home", "privacy", "static", "favicon"}
+
     @app.after_request
     def headers(response):
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        if request.endpoint not in PUBLIC_ENDPOINTS:
+            response.headers["X-Robots-Tag"] = "noindex, nofollow"
         response.headers["X-Content-Type-Options"] = "nosniff"
         # No external origins at all: no CDN, no remote crests, no fonts.
         response.headers["Content-Security-Policy"] = (
@@ -325,6 +330,13 @@ def create_app(database_path=None, config=None):
 
         floor = int(config.get("ADMIN_MIN_BUCKET") or stats.MIN_BUCKET)
         return render_template("admin.html", data=stats.summary(db(), floor=floor))
+
+    @app.route("/")
+    def home():
+        """The bare domain. The Bluesky handle IS this domain, so anyone who
+        reads the profile and types it in lands here; before this route
+        existed they got a bare Flask 404."""
+        return render_template("index.html")
 
     @app.route("/favicon.ico")
     def favicon():

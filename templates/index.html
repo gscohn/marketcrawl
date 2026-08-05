@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Sportscrawl — a daily score digest by DM{% endblock %}
+
+{% block robots %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+
+    <h1 class="h2 mb-3">One DM a day with your teams' scores.</h1>
+    <p class="lead text-body-secondary">
+      Last night's finals and today's games, for the teams you follow. Nothing
+      else: no feed, no notifications, no app to install.
+    </p>
+
+    <div class="card my-4">
+      <div class="card-body">
+        <h2 class="h6 text-body-secondary mb-3">This is the whole product</h2>
+        <pre class="mb-0 p-3 rounded" style="background: var(--sc-navy); color: var(--sc-cream); font-size: .95rem; white-space: pre-wrap;">Wed Aug 5
+
+Final
+&#9918; Dodgers 1, Cubs 5
+&#127936; Liberty 95, Storm 83
+
+Today
+&#9917; LAFC at Austin FC 5:30p
+&#127944; Kings vs Oilers 7:30p</pre>
+      </div>
+    </div>
+
+    <h2 class="h4 mt-5">How to start</h2>
+    <ol class="mt-3">
+      <li class="mb-2">
+        Send a direct message to
+        <strong>@sportscrawl.app</strong> on Bluesky. Anything will do —
+        <code>hello</code> is fine.
+      </li>
+      <li class="mb-2">
+        It replies with a link. Pick your teams and the time you want the
+        digest to arrive.
+      </li>
+      <li>That's it. The first digest arrives at your chosen time.</li>
+    </ol>
+
+    <h2 class="h4 mt-5">What you get</h2>
+    <ul>
+      <li>MLB, NBA, WNBA, NFL, NHL, MLS, NWSL and the Premier League, plus the
+        World Cup, Champions League and Concacaf competitions.</li>
+      <li>One message, at the time you choose, in your timezone.</li>
+      <li><strong>Silence on days your teams don't play.</strong> An NFL-only
+        subscriber hears nothing from February to September.</li>
+    </ul>
+
+    <h2 class="h4 mt-5">Stopping</h2>
+    <p>
+      DM <code>stop</code> to pause and keep your settings, or
+      <code>delete</code> to remove everything. Both work immediately, and
+      <code>delete</code> asks once before it does anything irreversible.
+    </p>
+
+    <p class="text-body-secondary mt-5">
+      Sportscrawl is a personal project with no company behind it and no uptime
+      guarantee. It stores your Bluesky account id, your timezone, your
+      delivery time and your team choices — nothing else. The
+      <a href="{{ url_for('privacy') }}">privacy policy</a> says exactly what
+      that means.
+    </p>
+
+  </div>
+</div>
+{% endblock %}

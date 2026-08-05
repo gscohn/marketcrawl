@@ -178,10 +178,12 @@ def test_saving_replaces_selections_wholesale(env):
 
 
 def test_security_headers_are_present(env):
+    """Referrer-Policy and the CSP apply everywhere. X-Robots-Tag does not:
+    the landing page and privacy policy are meant to be found, and that is
+    asserted separately."""
     app, db, now = env
     reply = app.test_client().get("/privacy")
     assert reply.headers["Referrer-Policy"] == "no-referrer"
-    assert "noindex" in reply.headers["X-Robots-Tag"]
     # No external origins: no CDN, no remote crests. Section 12 promises ESPN
     # sees the server, not the users.
     assert "default-src 'self'" in reply.headers["Content-Security-Policy"]
@@ -353,3 +355,39 @@ def test_the_root_favicon_path_is_served(env):
     reply = app.test_client().get("/favicon.ico")
     assert reply.status_code == 200
     assert reply.data[:4] == b"\x00\x00\x01\x00"  # ICO magic number
+
+
+# --------------------------------------------------------------------------
+# Landing page
+# --------------------------------------------------------------------------
+
+
+def test_the_bare_domain_serves_a_landing_page(env):
+    """The Bluesky handle IS this domain, so anyone reading the profile and
+    typing it in lands here. It was a bare Flask 404."""
+    app, _, _ = env
+    reply = app.test_client().get("/")
+    assert reply.status_code == 200
+    assert b"@sportscrawl.app" in reply.data
+    assert b"Privacy" in reply.data or b"privacy" in reply.data
+
+
+def test_the_landing_page_and_privacy_are_indexable(env):
+    """They are meant to be found. The bio points at the domain."""
+    app, _, _ = env
+    client = app.test_client()
+    for path in ("/", "/privacy"):
+        reply = client.get(path)
+        assert "X-Robots-Tag" not in reply.headers, path
+        assert b'name="robots"' not in reply.data, path
+
+
+def test_capability_and_operator_routes_stay_noindex(env):
+    """Anything carrying a token, or belonging to the operator, stays out."""
+    app, db, now = env
+    client = app.test_client()
+    client.get("/c/%s" % mint(db, now))
+
+    for path in ("/settings", "/admin", "/c/whatever"):
+        reply = client.get(path)
+        assert "noindex" in reply.headers.get("X-Robots-Tag", ""), path

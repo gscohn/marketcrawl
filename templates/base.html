@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow">
+  {% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
   <meta name="theme-color" content="#1B2A4A">
   <title>{% block title %}Sportscrawl{% endblock %}</title>
   {# The .ico carries 16, 32 and 48px; the PNG is the modern path. Both are
