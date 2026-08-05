@@ -1170,6 +1170,29 @@ Restarting the scheduler mid-batch must be safe. The per-message
 `last_sent_date` commit described in section 7 is what makes it safe, so a
 deploy at 7:05am resumes rather than re-sending.
 
+### Liveness
+
+Added after the first unattended run failed. The scheduler was alive for eight
+hours, held the correct database, and classified the due subscriber correctly
+when asked directly — but delivered nothing and logged nothing. `systemctl
+is-active` said `active` throughout.
+
+Two properties every long-running loop here needs:
+
+- **An idle loop must look different from a wedged one.** Python block buffers
+  stdout when it is not a TTY, so both workers had produced no output at all
+  since starting. `PYTHONUNBUFFERED=1` on every unit, explicit `flush=True`,
+  and a heartbeat: the first completed tick, then one line every fifteen
+  minutes. systemd's `Started` only means the process spawned.
+- **A wedged loop must not wait to be noticed.** `Restart=always` only helps if
+  the process dies, and this one never did. A watchdog thread exits the process
+  when no tick has completed in five minutes and lets systemd restart it.
+
+Restarting mid-batch is safe, so a watchdog restart costs nothing: the
+per-message `last_sent_date` commit in section 7 makes it resume rather than
+re-send. Verified — the redeploy immediately after that morning's late digest
+did not send a second one.
+
 ### Migrations
 
 The database persists across deploys, so schema changes need a plan from the
