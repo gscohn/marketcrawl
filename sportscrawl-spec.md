@@ -1144,12 +1144,27 @@ placement" below.
 
 ### Deploy process
 
-A `deploy.sh` in the repo, run on the server:
+A `deploy.sh` in the repo, run on the server as root:
 
 1. `git pull`
 2. Install dependencies if `requirements.txt` changed
 3. Run pending schema migrations
-4. `systemctl restart` both units, gunicorn first, then the scheduler
+4. Seed teams and crests if the table is empty
+5. `systemctl restart` the three units, gunicorn first, then the workers
+6. **Verify against the running system**
+
+Step 6 is the one experience argued for. Every step exiting zero is not
+evidence of a working deploy: the seed script once printed `total 205` while
+writing to a database file the web process could not see, and a checklist that
+trusts exit codes would have called that a success.
+
+So the script asks the application what it can actually observe: units active,
+privacy page 200, stylesheet 200, and the count of teams visible through the
+same config loader gunicorn uses. It also refuses to start if the env file has
+CRLF line endings, and probes that `/.well-known/` is not proxied to gunicorn.
+
+Three units, not two: `sportscrawl-web`, `sportscrawl-scheduler`, and
+`sportscrawl-poller`.
 
 Restarting the scheduler mid-batch must be safe. The per-message
 `last_sent_date` commit described in section 7 is what makes it safe, so a
