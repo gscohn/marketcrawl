@@ -193,6 +193,11 @@ def create_app(database_path=None, config=None):
         repo.record_event(
             db(), now, "config_load", row["did"], config.get("EVENTS_PEPPER", "dev")
         )
+        # Land on the page the token was issued for. Redirecting everything to
+        # the config page made the admin link create a valid admin session and
+        # then drop the operator on the wrong screen.
+        if row["scope"] == "admin":
+            return redirect(url_for("admin"))
         return redirect(url_for("config_page"))
 
     # -- config page ------------------------------------------------------

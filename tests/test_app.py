@@ -301,3 +301,24 @@ def test_small_buckets_are_suppressed(env):
 
     assert "Dodgers" in page          # the row exists
     assert "fewer than 5" in page     # but the count is withheld
+
+
+def test_an_admin_token_lands_on_the_admin_page(env):
+    """It created a valid admin session and then redirected to the config
+    page, which looked exactly like the admin page not working."""
+    app, db, now = env
+    client = app.test_client()
+    reply = client.get("/c/%s" % mint(db, now, scope="admin"))
+
+    assert reply.status_code == 302
+    assert reply.headers["Location"].endswith("/admin")
+
+    page = client.get("/admin")
+    assert page.status_code == 200
+    assert b"Aggregates only" in page.data
+
+
+def test_a_config_token_still_lands_on_settings(env):
+    app, db, now = env
+    reply = app.test_client().get("/c/%s" % mint(db, now, scope="config"))
+    assert reply.headers["Location"].endswith("/settings")
