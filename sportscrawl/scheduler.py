@@ -58,11 +58,13 @@ class TickReport:
     silent: int = 0
     expired: int = 0
     deferred: int = 0
+    errors: int = 0
 
     def __str__(self) -> str:
         return (
-            "sent=%d failures=%d silent=%d expired=%d deferred=%d"
-            % (self.sent, self.failures, self.silent, self.expired, self.deferred)
+            "sent=%d failures=%d silent=%d expired=%d deferred=%d errors=%d"
+            % (self.sent, self.failures, self.silent, self.expired,
+               self.deferred, self.errors)
         )
 
 
@@ -142,7 +144,19 @@ class Scheduler:
             repo.save_league_health(self._db, health)
 
         for candidate in due:
-            self._deliver(candidate, window, now, report)
+            try:
+                self._deliver(candidate, window, now, report)
+            except Exception as exc:
+                # One subscriber's failure must not cost everyone else their
+                # digest. Without this, a single bad send aborts the batch and
+                # the supervisor restarts the process into the same failure on
+                # the next tick.
+                #
+                # The row is deliberately left unevaluated, so the subscriber
+                # is retried on the next tick while they are still inside the
+                # lateness window, and dropped quietly once past it.
+                report.errors += 1
+                print("send failed for %s: %s" % (candidate.did, exc))
             self._sleep(self._gap)
 
         return report

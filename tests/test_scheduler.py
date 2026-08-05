@@ -373,10 +373,12 @@ def test_a_crash_mid_batch_resumes_without_resending(db):
     sender = Recorder(fail_after=2)
     engine = scheduler(db, source, sender)
 
-    with pytest.raises(RuntimeError):
-        engine.tick(utc(2026, 8, 4, 14, 0))
+    report = engine.tick(utc(2026, 8, 4, 14, 0))
 
+    # The failures are isolated: the batch finishes rather than aborting, and
+    # the subscribers who failed are left unevaluated so the next tick retries.
     assert len(sender.sent) == 2
+    assert report.errors == 3
     delivered = {did for did, _ in sender.sent}
 
     # Restart: a fresh sender, the same database.
