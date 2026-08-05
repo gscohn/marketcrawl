@@ -37,12 +37,17 @@ def build(database_path: str, pepper: str, sender=None) -> Scheduler:
     )
 
 
-def chat_sender(config, allowed_dids):
-    """Real delivery, restricted to an explicit allowlist.
+def chat_sender(config, allowed_dids=None):
+    """Real delivery.
 
-    Step 4 is "chat send, to one DID only". Enforced in code rather than by
-    remembering, because the failure mode is messaging strangers from a
-    half-finished bot.
+    With `allowed_dids`, sends are restricted to that list and anything else
+    raises. That was build step 4's "to one DID only", enforced in code rather
+    than by remembering.
+
+    Without it, every subscriber is served. The allowlist stays available
+    because it is the right tool for the next risky change, but leaving it on
+    after opening signups means new subscribers configure teams, wait for
+    their send time, and silently receive nothing.
     """
     from sportscrawl.chat import ChatClient
     from sportscrawl.senders import AllowlistSender, ChatSender
@@ -50,7 +55,8 @@ def chat_sender(config, allowed_dids):
     require(config, "BSKY_IDENTIFIER", "BSKY_APP_PASSWORD")
     client = ChatClient(config["BSKY_IDENTIFIER"], config["BSKY_APP_PASSWORD"])
     client.login()
-    return AllowlistSender(ChatSender(client), allowed_dids)
+    sender = ChatSender(client)
+    return AllowlistSender(sender, allowed_dids) if allowed_dids else sender
 
 
 def main(argv=None) -> int:
@@ -65,7 +71,7 @@ def main(argv=None) -> int:
         "--to",
         action="append",
         default=[],
-        help="DID allowed to receive messages; repeatable",
+        help="restrict sends to these DIDs; repeatable. Omit to serve everyone.",
     )
     parser.add_argument(
         "--database",
@@ -77,10 +83,12 @@ def main(argv=None) -> int:
     config = settings()
     sender = None
     if args.send:
-        if not args.to:
-            print("--send requires at least one --to DID", file=sys.stderr)
-            return 2
-        sender = chat_sender(config, args.to)
+        sender = chat_sender(config, args.to or None)
+        if args.to:
+            print("restricted to %d DID(s): %s" % (len(args.to), ", ".join(args.to)),
+                  flush=True)
+        else:
+            print("sending to all active subscribers", flush=True)
 
     pepper = config.get("EVENTS_PEPPER") or os.environ.get("EVENTS_PEPPER")
     if not pepper:
