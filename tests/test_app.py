@@ -418,3 +418,14 @@ def test_the_front_page_leads_with_the_full_wordmark(env):
     assert "sportscrawl-wordmark-horizontal.png" in page
     assert "sc-navbar" not in page          # navbar suppressed here
     assert "wordmark-navbar.png" not in page
+
+
+def test_the_footer_links_to_the_source_repository(env):
+    """On every page, since the footer is in the base template."""
+    app, db, now = env
+    client = app.test_client()
+
+    for path in ("/", "/privacy"):
+        page = client.get(path).data.decode("utf-8")
+        assert "Source Code:" in page, path
+        assert "https://github.com/cruftbox/sportscrawl" in page, path
