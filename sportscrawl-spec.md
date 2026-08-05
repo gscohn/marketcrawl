@@ -359,7 +359,7 @@ response that fails validation is a failure, not an empty slate.
 |---|---|
 | connect / read timeout | 5s / 10s |
 | retries | 2, exponential backoff, only on timeout, connection error, 5xx, 429 |
-| User-Agent | `sportscrawl/1.0 (+https://sportscrawl.app)` |
+| User-Agent | `python-requests/{version} sportscrawl/1.0 (+https://sportscrawl.app)` |
 | scoreboard cache TTL | 10 minutes |
 | `/sports/soccer` slug cache TTL | 24 hours, stale-if-error |
 | `/teams` refresh | weekly, manual trigger available |
@@ -370,8 +370,23 @@ The slug cache exists so a soccer outage does not take out slug resolution;
 serve stale slugs indefinitely rather than failing, since a slug that resolved
 yesterday is almost certainly still right.
 
-Identify the client honestly in the User-Agent. This is an unofficial endpoint
-being used politely, and a forged browser string would make it something else.
+Identify the client honestly in the User-Agent — but the honest string cannot
+go first. **ESPN 403s unrecognised user agents.** Verified 2026-08-04: bare
+`sportscrawl/1.0` is refused, and so is `foobar/1.0`, while `curl/8.5.0`,
+`python-requests/2.32.5`, and no User-Agent at all are all served. It is an
+allowlist of known clients, not a block on bots, and it fails closed on
+everything it does not recognise.
+
+So the client token leads and the identification follows it. This is still not
+a forged browser: `python-requests` really is the client, `sportscrawl/1.0`
+says who is driving it, and anyone reading ESPN's logs can tell exactly what
+this is and where to complain. Sending `Mozilla/5.0` would be the line, and it
+is not necessary.
+
+Both halves are load-bearing. Drop the prefix and every request 403s; drop the
+suffix and the traffic becomes anonymous. Worth a comment in the code, because
+this looks like cargo cult until you know the endpoint refuses the obvious
+thing.
 
 Every fetch outcome updates `league_state`: `last_fetch_at` always,
 `last_success_at` and `last_event_date` on a validated parse,

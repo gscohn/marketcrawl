@@ -1,2 +1,2 @@
-# Runtime deps land in build step 2 (requests) and step 6 (Flask, gunicorn).
+requests==2.32.5
 # Python 3.9 is the target: see spec section 13.
