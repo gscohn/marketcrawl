@@ -15,10 +15,14 @@ from .models import Digest, Event, Sub
 
 HANDLE = "@sportscrawl.app"
 
-# Bluesky does not document the chat message cap. This is a placeholder that
-# MUST be verified empirically before launch (spec section 6) by sending a
-# deliberately long message and seeing where it breaks. The overflow path is
-# built and tested regardless, so raising or lowering this is a one-line change.
+# Verified 2026-08-04 against the live API, not guessed: sendMessage rejects
+# anything longer with
+#   "grapheme too big (maximum 1000, got 4960) at $.message.text"
+#
+# Graphemes, not codepoints. len() counts codepoints, which over-counts a
+# decomposed accent and never under-counts for anything a digest line can
+# hold. That errs toward trimming a line early rather than having the whole
+# message rejected at send time, which is the right direction to be wrong in.
 MAX_MESSAGE = 1000
 
 MISSING_DATA_LINE = "Some scores are missing."

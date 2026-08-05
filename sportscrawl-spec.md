@@ -528,8 +528,25 @@ not for a 162-game season.
 
 ### Length
 
-Typical output is well under any DM cap. The limit only bites on a World Cup
-group-stage day. Verify the actual cap empirically; it is not documented.
+Typical output is well under the DM cap. The limit only bites on a World Cup
+group-stage day.
+
+**The cap is 1000 graphemes. Verified 2026-08-04**, by sending a deliberately
+over-long message and reading the rejection:
+
+```
+InvalidRequest: grapheme too big (maximum 1000, got 4960) at $.message.text
+```
+
+Graphemes, not bytes and not codepoints. Counting with Python's `len()` counts
+codepoints, which over-counts a decomposed accent (`é` as `e` + combining mark
+is two codepoints and one grapheme) and never under-counts for the characters
+this digest can contain. Over-counting trims a line early; under-counting would
+get a whole message rejected at send time. The approximation is therefore safe
+in the direction that matters, and precise grapheme segmentation is not worth a
+dependency.
+
+For reference, a full 14-match MLS Saturday renders in 397 characters.
 
 Overflow strategy is priority ordering, not byte truncation:
 
@@ -543,8 +560,10 @@ notification preview carries it.
 
 ### Newlines
 
-Verify empirically that newlines survive `chat.bsky.convo.sendMessage` and
-render as line breaks in the client. The entire format depends on it.
+**Verified 2026-08-04.** A 13-line digest sent through
+`chat.bsky.convo.sendMessage` and read back with `getMessages` came back byte
+for byte identical, newlines intact. The transport preserves them; the entire
+format depends on it and it holds.
 
 ### Empty digest
 
@@ -677,13 +696,27 @@ lost between the API call and the commit. Re-running `stop` on a paused
 subscriber, or `delete confirm` on a DID that no longer exists, must be a
 no-op, not an error and not a second reply.
 
-**Message requests.** With the DM setting on "everyone," messages from accounts
-the bot does not follow land in a Message Requests folder rather than the main
-inbox. Verify empirically whether `listConvos` surfaces these by default or
-whether a status filter is required. If the poll loop only reads accepted
-conversations, every new signup is invisible and the bot appears dead to anyone
-trying it. Test by DMing the bot cold from a second account and inspecting the
-raw API response. This is a launch blocker, not a detail.
+**Message requests. RESOLVED 2026-08-04, and the answer is the good one.**
+
+Tested by DMing the bot cold from `cruftbox.com`, an account it does not
+follow. Results against the live API:
+
+| query | result |
+|---|---|
+| `listConvos` (no params) | **1 convo**, carrying `status: "request"` |
+| `listConvos?status=request` | 1 convo, the same one |
+| `listConvos?status=accepted` | 0 convos |
+
+The default view **does** include message requests, so the poll loop needs no
+filter and no signup is invisible. `getMessages` and `sendMessage` both work on
+a request-status conversation without accepting it first, so there is no accept
+step to forget either.
+
+Two things follow. Do not "fix" the poll loop by adding `status=accepted`: that
+is precisely the filter that would make every new signup invisible and the bot
+appear dead to anyone trying it. And do read `convo.status` anyway — it is
+available, and a conversation that is still a request is a subscriber who has
+never had a reply land in their main inbox.
 
 The app password is a full-access credential for the bot account. Env file,
 mode 600, never in the repo.
