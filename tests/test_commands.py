@@ -370,3 +370,43 @@ def test_the_cursor_advances_past_our_own_replies(db, handler):
     report = Poller(db, client, handler, bot_did=bot).poll(NOW)
     assert report.skipped == 0        # m2 is behind the cursor now
     assert report.handled == 1
+
+
+def test_a_fresh_database_does_not_replay_old_conversation_history(db, handler):
+    """Observed on the first production deploy: an empty convo_state meant the
+    poller re-answered a day-old message. A thread containing an old
+    `delete confirm` would have executed it."""
+    old = {"id": "m1", "text": "delete confirm", "sender": {"did": DID},
+           "sentAt": "2026-08-03T12:00:00Z"}
+    client = FakeClient([{"id": CONVO, "unreadCount": 1}], {CONVO: [old]})
+    repo.create_subscriber(db, DID, NOW, PEPPER)
+
+    report = Poller(db, client, handler).poll(NOW)
+
+    assert report.handled == 0
+    assert client.sent == []
+    assert repo.get_subscriber(db, DID) is not None      # not deleted
+    assert repo.last_message_id(db, CONVO) == "m1"       # but adopted
+
+
+def test_a_new_subscribers_first_message_is_still_answered(db, handler):
+    fresh = {"id": "m1", "text": "hello", "sender": {"did": DID},
+             "sentAt": "2026-08-04T13:59:30Z"}
+    client = FakeClient([{"id": CONVO, "unreadCount": 1}], {CONVO: [fresh]})
+
+    report = Poller(db, client, handler).poll(NOW)
+    assert report.handled == 1
+    assert len(client.sent) == 1
+
+
+def test_a_backlog_after_downtime_is_still_handled(db, handler):
+    """The adoption rule applies only with no cursor. An outage leaves one."""
+    client = FakeClient(
+        [{"id": CONVO, "unreadCount": 1}],
+        {CONVO: [{"id": "m1", "text": "hi", "sender": {"did": DID},
+                  "sentAt": "2026-08-04T13:00:00Z"}]},
+    )
+    repo.set_last_message(db, CONVO, "m0")
+
+    report = Poller(db, client, handler).poll(NOW)
+    assert report.handled == 1

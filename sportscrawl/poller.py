@@ -8,10 +8,33 @@ re-reads recent history and re-executes commands. Spec section 8.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from . import repo
 from .chat import parse_messages
+
+# How old a message can be and still be acted on when a conversation has no
+# stored cursor. New subscribers always message within seconds of arriving, so
+# this only ever suppresses backlog.
+ADOPTION_WINDOW = timedelta(hours=1)
+
+
+def _older_than(sent_at: str, now: datetime, window: timedelta) -> bool:
+    """True when a timestamp is definitely older than the window.
+
+    An unparseable or missing timestamp returns False: acting on a message is
+    the safer default than silently swallowing a real command.
+    """
+    if not sent_at:
+        return False
+    try:
+        cleaned = sent_at.replace("Z", "+00:00")
+        stamp = datetime.fromisoformat(cleaned)
+    except ValueError:
+        return False
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return stamp < now - window
 
 
 @dataclass
@@ -64,6 +87,23 @@ class Poller:
         newest = cursor
         for message in messages:
             if cursor is not None and message.message_id <= cursor:
+                continue
+
+            if cursor is None and _older_than(message.sent_at, now, ADOPTION_WINDOW):
+                # First sight of this conversation and the message predates
+                # us. Adopt it silently instead of acting on it.
+                #
+                # A fresh database against an existing thread would otherwise
+                # replay the entire history as new commands: duplicate help at
+                # best, an old `delete confirm` executing at worst. Observed on
+                # the first production deploy, which re-answered a day-old
+                # message.
+                #
+                # This only applies with no cursor at all. An outage leaves a
+                # cursor behind, so a backlog after downtime is still handled.
+                repo.set_last_message(self._db, convo_id, message.message_id)
+                newest = message.message_id
+                report.skipped += 1
                 continue
             if self._bot_did and message.sender_did == self._bot_did:
                 # Our own replies come back in the same thread. Handling them
