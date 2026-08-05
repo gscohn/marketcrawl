@@ -10,3 +10,5 @@ instance/
 # scratch
 *.pyc
 .pytest_cache/
+static/crests/
+static/vendor/

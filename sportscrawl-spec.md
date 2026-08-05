@@ -185,10 +185,20 @@ and the config page picker.
 | expires_at | short lifetime, see section 10 |
 | used_at | null until first load |
 
-Single use. A token that has been redeemed for a session is spent even if it
-has not expired; reloading the DM link a second time issues nothing and shows a
-"ask the bot for a fresh link" page. Expiry and single use are independent
-checks and both must pass.
+**Not single use.** An earlier revision of this spec said single use, and
+building it proved that wrong within minutes: the first test link was dead
+before it reached a browser.
+
+The link is delivered in a Bluesky DM, and chat clients fetch URLs to build
+link previews. A single-use token would routinely be spent by a preview
+crawler before the subscriber ever tapped it, and the same is true of a
+browser prefetch, a double click, or a reload. The failure is silent and looks
+exactly like a bug in the bot.
+
+So a token is redeemable repeatedly until `expires_at`. `used_at` records the
+first redemption, for the return-visit metric in section 11, and invalidates
+nothing. Security rests on the token being unguessable and short lived, which
+is where it rested anyway — single use was never what made it safe.
 
 ### sessions
 
@@ -312,6 +322,7 @@ US pro:
 - `hockey/nhl`
 - `basketball/wnba`
 - `soccer/usa.1` (MLS)
+- `soccer/usa.nwsl` (NWSL)
 
 Soccer and tournaments:
 
@@ -854,9 +865,12 @@ Route: `https://sportscrawl.app/c/<token>`
 The DM channel is already authenticated, so a capability URL delivered over it
 is no weaker than the channel itself. No login UI at all.
 
-Token is short-lived and single-use, and exchanges for a session cookie on
-first load. The link dies in fifteen minutes; the browser stays authorized for
-thirty days. `config` issues a fresh one anytime and invalidates the previous.
+Token is short-lived and exchanges for a session cookie on load. The link dies
+in fifteen minutes; the browser stays authorized for thirty days. `config`
+issues a fresh one anytime and invalidates the previous.
+
+The token is **not** single use — see section 4. A link preview crawler would
+spend it before the subscriber ever tapped it.
 
 ### Session and route hardening
 

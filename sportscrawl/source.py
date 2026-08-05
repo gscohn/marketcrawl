@@ -34,6 +34,7 @@ US_PRO_LEAGUES = (
 
 SOCCER_LEAGUES_AT_LAUNCH = (
     "soccer/usa.1",  # MLS
+    "soccer/usa.nwsl",  # NWSL
     "soccer/eng.1",  # Premier League
     "soccer/fifa.world",
     "soccer/uefa.champions",

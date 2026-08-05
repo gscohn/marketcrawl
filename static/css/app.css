@@ -1,0 +1,9 @@
+body { font-family: system-ui, -apple-system, sans-serif; }
+.navbar-brand { letter-spacing: 0.05em; }
+.btn-check:checked + .btn { border-color: var(--bs-primary); }
+
+/* Collapsed league drawers. Native <details> so the picker needs no JS. */
+.league > summary { cursor: pointer; list-style: none; border-bottom: 1px solid var(--bs-border-color); }
+.league > summary::-webkit-details-marker { display: none; }
+.league > summary::before { content: "\25B8"; margin-right: .5rem; color: var(--bs-secondary-color); }
+.league[open] > summary::before { content: "\25BE"; }

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}Sportscrawl{% endblock %}</title>
+  {# Vendored, not a CDN. Section 12 promises no third parties, and a CDN
+     request hands the visitor's IP to one on the page that configures their
+     subscription. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container">
+      <span class="navbar-brand fw-bold">&#127936; Sportscrawl</span>
+      <span class="navbar-text small">{% block navnote %}{% endblock %}</span>
+    </div>
+  </nav>
+  <div class="container my-4">
+    {% block content %}{% endblock %}
+  </div>
+  <footer class="container text-body-secondary small pb-5">
+    <hr>
+    <a href="{{ url_for('privacy') }}">Privacy</a>
+    &middot; Daily scores by DM from
+    <span class="text-body">@sportscrawl.app</span>
+  </footer>
+</body>
+</html>

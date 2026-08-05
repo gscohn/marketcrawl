@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Sportscrawl settings{% endblock %}
+
+{% block content %}
+{% if saved %}
+<div class="alert alert-success">Saved. Your next digest uses these settings.</div>
+{% endif %}
+
+<form method="post" id="settings-form">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+
+  {# Timezone first, above everything. It is the one field with no safe
+     default, and nothing below it means anything until it is set: a delivery
+     time without a timezone is not a time. Spec section 10. #}
+  <section class="card mb-4 border-primary">
+    <div class="card-body">
+      <h2 class="h5 card-title">1. Your timezone</h2>
+      <p class="text-body-secondary small mb-3">
+        Everything else depends on this. We have guessed from your browser —
+        check it is right.
+      </p>
+      <div class="row g-3">
+        <div class="col-md-7">
+          <label class="form-label" for="tz">Timezone</label>
+          <select class="form-select" name="tz" id="tz" required>
+            <option value="" disabled {% if not subscriber['tz'] %}selected{% endif %}>
+              Choose your timezone…
+            </option>
+            {% for zone in timezones %}
+            <option value="{{ zone }}" {% if zone == subscriber['tz'] %}selected{% endif %}>
+              {{ zone.replace('_', ' ') }}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-text" id="tz-hint"></div>
+          <button type="button" class="btn btn-sm btn-primary mt-2 d-none" id="tz-confirm"></button>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label" for="send_time">Delivery time</label>
+          <select class="form-select" name="send_time" id="send_time">
+            {% for value, label in times %}
+            <option value="{{ value }}"
+              {% if value == subscriber['send_time'] %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Local to the timezone above.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5 card-title">2. Your teams</h2>
+      <p class="text-body-secondary small">
+        Pick as many as you like. You only hear about days they play.
+      </p>
+
+      {# Collapsed by default. 205 teams laid out flat is roughly 4,700px of
+         scrolling on a phone, about twelve screens. Native <details> needs no
+         JavaScript and is keyboard and screen-reader accessible for free.
+         A league the subscriber has already picked from opens automatically,
+         so their existing choices are never hidden behind a closed drawer. #}
+      {% for league, teams in grouped.items() %}
+      <details class="league mt-3" {% if selected_counts.get(league) %}open{% endif %}>
+        <summary class="d-flex justify-content-between align-items-center py-2">
+          <span class="fw-semibold">{{ league_labels.get(league, league) }}</span>
+          <span class="badge rounded-pill {{ 'text-bg-primary' if selected_counts.get(league) else 'text-bg-secondary' }}">
+            {% if selected_counts.get(league) %}{{ selected_counts[league] }} selected{% else %}{{ teams|length }}{% endif %}
+          </span>
+        </summary>
+      <div class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 g-2 pt-2">
+
+        {% for team in teams %}
+        <div class="col">
+          <input type="checkbox" class="btn-check" autocomplete="off"
+                 name="team" value="{{ league }}|{{ team['team_id'] }}"
+                 id="t{{ league }}{{ team['team_id'] }}"
+                 {% if (league, team['team_id']) in chosen_teams %}checked{% endif %}>
+          <label class="btn btn-outline-secondary w-100 text-start d-flex align-items-center gap-2 py-2"
+                 for="t{{ league }}{{ team['team_id'] }}">
+            <img src="{{ url_for('static', filename='crests/' + league.replace('/', '_') + '/' + team['team_id'] + '.png') }}"
+                 alt="" width="28" height="28" loading="lazy"
+                 onerror="this.style.visibility='hidden'">
+            <span class="small text-truncate">{{ team['short_name'] or team['display_name'] }}</span>
+          </label>
+        </div>
+        {% endfor %}
+      </div>
+      </details>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5 card-title">3. Competitions</h2>
+      <p class="text-body-secondary small">
+        Whole tournaments rather than single teams. These also show you
+        tomorrow's fixtures, because tournament matches cluster.
+      </p>
+      {% for slug, label in competitions %}
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="competition"
+               value="{{ slug }}" id="c{{ slug }}"
+               {% if slug in chosen_comps %}checked{% endif %}>
+        <label class="form-check-label" for="c{{ slug }}">{{ label }}</label>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="d-flex align-items-center gap-3 mb-5">
+    <button class="btn btn-primary btn-lg" id="save" type="submit">Save settings</button>
+    <span class="text-body-secondary small" id="save-hint"></span>
+  </div>
+</form>
+
+<script>
+  // Prefilled is not confirmed, but confirming must always be possible.
+  //
+  // An earlier version pre-selected the browser's guess and waited for a
+  // `change` event to enable Save. When the guess was already right, choosing
+  // that same value fires no change event, so Save could never be enabled and
+  // the page deadlocked. The confirmation is now an explicit button, and
+  // picking any zone by hand works too.
+  (function () {
+    var select = document.getElementById('tz');
+    var hint = document.getElementById('tz-hint');
+    var confirm = document.getElementById('tz-confirm');
+    var save = document.getElementById('save');
+    var saveHint = document.getElementById('save-hint');
+
+    function unlock() {
+      save.disabled = false;
+      saveHint.textContent = '';
+      hint.textContent = '';
+      confirm.classList.add('d-none');
+    }
+
+    if (select.value) {
+      return;  // a returning subscriber already answered this
+    }
+
+    save.disabled = true;
+    saveHint.textContent = 'Set your timezone first.';
+
+    var guess = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    var match = Array.prototype.find.call(select.options, function (option) {
+      return option.value === guess;
+    });
+
+    if (match) {
+      hint.textContent = 'Your browser says ' + guess.replace(/_/g, ' ') + '.';
+      confirm.textContent = 'Use ' + guess.replace(/_/g, ' ');
+      confirm.classList.remove('d-none');
+      confirm.addEventListener('click', function () {
+        match.selected = true;
+        unlock();
+      });
+    }
+
+    select.addEventListener('change', function () {
+      if (select.value) { unlock(); }
+    });
+  })();
+</script>
+{% endblock %}
