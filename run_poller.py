@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from sportscrawl.chat import ChatClient
 from sportscrawl.commands import CommandHandler
 from sportscrawl.config import require, settings
+from sportscrawl.logs import configure
 from sportscrawl.db import open_database
 from sportscrawl.poller import Poller
 from sportscrawl.watchdog import Liveness
@@ -32,6 +33,7 @@ def main(argv=None) -> int:
     parser.add_argument("--database", default=None)
     args = parser.parse_args(argv)
 
+    configure()
     config = settings()
     require(config, "BSKY_IDENTIFIER", "BSKY_APP_PASSWORD", "EVENTS_PEPPER")
 

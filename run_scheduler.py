@@ -18,6 +18,7 @@ import time
 from datetime import datetime, timezone
 
 from sportscrawl.config import require, settings
+from sportscrawl.logs import configure
 from sportscrawl.db import open_database
 from sportscrawl.scheduler import Scheduler, stdout_sender
 from sportscrawl.source import SOCCER_LEAGUES_AT_LAUNCH, US_PRO_LEAGUES, EspnSource
@@ -72,6 +73,7 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
+    configure()
     config = settings()
     sender = None
     if args.send:

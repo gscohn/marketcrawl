@@ -26,6 +26,7 @@ from flask import (
 from sportscrawl import repo, stats
 from sportscrawl.config import settings
 from sportscrawl.db import open_database
+from sportscrawl.logs import configure
 
 TOKEN_TTL = timedelta(minutes=15)
 CONFIG_SESSION_TTL = timedelta(days=30)
@@ -91,6 +92,7 @@ def delivery_times():
 
 
 def create_app(database_path=None, config=None):
+    configure()
     config = config or settings()
     app = Flask(__name__)
     app.secret_key = config.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
