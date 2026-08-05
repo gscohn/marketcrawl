@@ -123,20 +123,28 @@ DMs already, and the admin page requires deciding to look.
   `deploy.sh` reseeds them when the table is empty.
 - **Bluesky conversation history** is not ours to back up or delete.
 
-## ACTION: two things need a human
+## Permissions, and a failure worth remembering
 
-1. **Activate the NAS cron.** The entry is written to `/etc/config/crontab`,
-   which QNAP reads at boot, but the running daemon has not picked it up and
-   `crontab` needs root. As admin on bandersnatch:
+The backup directory is `750`, group `sportscrawl`, and snapshots are `640`.
+Group readable so `scbackup` can pull them; never world readable, because they
+contain every subscriber's DID.
 
-   ```bash
-   crontab /etc/config/crontab && /etc/init.d/crond.sh restart
-   crontab -l | grep sportscrawl        # confirm
-   ```
+An early version of `backup.sh` ran `chmod 700` on that directory on every
+run. The first pull succeeded, against a directory that had been widened by
+hand, and the next snapshot silently closed it again. rsync then failed with
+`change_dir "/home/sportscrawl/backups" failed: Permission denied (13)`, and
+only the first night's copy would ever have existed.
 
-   Until then the pull only runs when invoked by hand. A reboot would also
-   activate it.
+This is the shape backup failures usually take: they work once, under
+conditions nobody wrote down, and stop without telling anyone. It was caught
+by running the whole chain rather than each half, and the daily report now
+catches the residue by shouting when the newest snapshot is over 36 hours old.
 
-2. **Separate app password for the server.** Production still shares the one
-   on straylight, so revoking either takes down the other and Bluesky offers
-   no way to tell them apart.
+## ACTION: one thing still needs a human
+
+**Separate app password for the server.** Production still shares the one on
+straylight, so revoking either takes down the other and Bluesky offers no way
+to tell them apart.
+
+The NAS cron is live: `0 10 * * * /share/Backup/sportscrawl-pull.sh`, loaded
+into the running daemon and persisted in `/etc/config/crontab`.

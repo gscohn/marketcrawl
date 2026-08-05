@@ -10,9 +10,9 @@ design; this is what has not been built or decided yet.
       Bluesky gives no way to tell them apart. Two minutes in Settings →
       Privacy and Security → App Passwords, with DM access ticked, then swap it
       into `/home/sportscrawl/.env` and restart.
-- [ ] **Watch one clean 07:00 run.** The first unattended run stalled silently;
-      the heartbeat and watchdog went in afterwards but have not yet proven
-      themselves through a morning.
+- [ ] **Watch one clean send.** The first unattended run stalled silently; the
+      heartbeat and watchdog went in afterwards but have not yet proven
+      themselves through a morning. Next fire is 05:30 America/Los_Angeles.
 - [ ] Ten known testers, two weeks, before any public post (spec section 16).
 
 ## Women's World Cup 2027
@@ -66,9 +66,9 @@ ended.
       stays.
 - [ ] Bootstrap is 232KB and now dominates first paint. A subset would cut most
       of it, at the cost of a build step this project does not have.
-- [ ] Backup: nightly pull of the SQLite file to bandersnatch, pulled from the
-      NAS rather than pushed, so a compromised server cannot write to it
-      (spec section 13). Not set up.
+- [x] Backup: nightly pull to bandersnatch, done. See docs/BACKUP.md.
+- [ ] Restore drill: run the documented restore into a scratch path once,
+      before it is needed rather than during an incident.
 
 ## Known ceilings, not tasks
 
