@@ -78,6 +78,27 @@ def resolve_pds(did: str, transport) -> str:
     raise FetchError("no PDS in DID document for %s" % did)
 
 
+# Bluesky signals an expired session with HTTP 400 and an error code in the
+# body, not 401. Matching only on 401 meant the re-login path never ran: the
+# scheduler logged in at boot, the token expired about sixteen hours later, and
+# every send after that failed identically and forever while the loop carried
+# on ticking healthily. Twice.
+AUTH_ERROR_CODES = frozenset(
+    {"ExpiredToken", "InvalidToken", "AuthMissing", "AuthenticationRequired"}
+)
+
+
+def _is_auth_error(reply) -> bool:
+    if reply.status_code == 401:
+        return True
+    if reply.status_code != 400:
+        return False
+    try:
+        return reply.json().get("error") in AUTH_ERROR_CODES
+    except ValueError:
+        return False
+
+
 def requests_transport(method, url, headers, payload, params=None):
     import requests
 
@@ -89,7 +110,7 @@ def requests_transport(method, url, headers, payload, params=None):
         params=params,
         timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
     )
-    if reply.status_code == 401:
+    if _is_auth_error(reply):
         raise Unauthorized(reply.text[:200])
     if reply.status_code != 200:
         raise FetchError("http %d from %s: %s" % (reply.status_code, url, reply.text[:200]))

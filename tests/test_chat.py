@@ -182,3 +182,72 @@ def test_send_message_attaches_facets_automatically():
     client(transport).send_message("c1", "Pick teams: https://sportscrawl.app/c/k9")
     message = transport.calls[-1]["payload"]["message"]
     assert message["facets"][0]["features"][0]["uri"] == "https://sportscrawl.app/c/k9"
+
+
+# --------------------------------------------------------------------------
+# Session expiry
+# --------------------------------------------------------------------------
+
+
+class FakeReply:
+    def __init__(self, status_code, payload=None, text=""):
+        self.status_code = status_code
+        self._payload = payload
+        self.text = text
+
+    def json(self):
+        if self._payload is None:
+            raise ValueError("no json")
+        return self._payload
+
+
+def test_an_expired_token_is_recognised_despite_being_a_400():
+    """Bluesky returns 400 with an error code, not 401. Matching only on 401
+    meant the re-login path never ran: the scheduler logged in at boot and
+    every send after the token expired failed identically, forever."""
+    from sportscrawl.chat import _is_auth_error
+
+    assert _is_auth_error(FakeReply(400, {"error": "ExpiredToken",
+                                          "message": "Token has expired"}))
+
+
+@pytest.mark.parametrize("code", ["InvalidToken", "AuthMissing",
+                                  "AuthenticationRequired"])
+def test_the_other_auth_error_codes_are_recognised(code):
+    from sportscrawl.chat import _is_auth_error
+
+    assert _is_auth_error(FakeReply(400, {"error": code}))
+
+
+def test_a_401_is_still_an_auth_error():
+    from sportscrawl.chat import _is_auth_error
+
+    assert _is_auth_error(FakeReply(401, None, "unauthorized"))
+
+
+def test_an_ordinary_400_is_not_an_auth_error():
+    """A malformed request must not trigger an endless login loop."""
+    from sportscrawl.chat import _is_auth_error
+
+    assert not _is_auth_error(FakeReply(400, {"error": "InvalidRequest",
+                                              "message": "grapheme too big"}))
+
+
+def test_a_400_with_no_json_body_is_not_an_auth_error():
+    from sportscrawl.chat import _is_auth_error
+
+    assert not _is_auth_error(FakeReply(400, None, "<html>gateway</html>"))
+
+
+def test_an_expired_session_recovers_by_logging_in_again():
+    """End to end through the client: the first call fails as expired, the
+    client re-logins and the retry succeeds."""
+    transport = FakeTransport({
+        "createSession": [SESSION, {"accessJwt": "token-2", "did": DID}],
+        "getConvoForMembers": [Unauthorized('{"error":"ExpiredToken"}'),
+                               {"convo": {"id": "c1"}}],
+    })
+    result = client(transport).convo_for_members([DID])
+
+    assert result["convo"]["id"] == "c1"
+    assert transport.calls[-1]["headers"]["Authorization"] == "Bearer token-2"
