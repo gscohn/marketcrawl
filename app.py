@@ -26,10 +26,14 @@ from flask import (
 
 from sportscrawl import repo, stats
 from sportscrawl.config import settings
-from sportscrawl.db import open_database
+from sportscrawl.db import connect, open_database
 from sportscrawl.logs import configure
 
 TOKEN_TTL = timedelta(minutes=15)
+
+# Spec section 10 asks for the capability route to be rate limited.
+RATE_LIMIT = 20
+RATE_WINDOW = timedelta(minutes=5)
 CONFIG_SESSION_TTL = timedelta(days=30)
 ADMIN_SESSION_TTL = timedelta(hours=24)
 
@@ -106,9 +110,15 @@ def create_app(database_path=None, config=None):
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
+    # Migrations run once here, not per request. open_database() migrates, and
+    # calling it from db() meant every page load recreated schema_version,
+    # queried it and globbed migrations/ -- and let a web worker race the
+    # scheduler applying a migration during a deploy.
+    open_database(app.config["DATABASE_PATH"]).close()
+
     def db():
         if "db" not in g:
-            g.db = open_database(app.config["DATABASE_PATH"])
+            g.db = connect(app.config["DATABASE_PATH"])
         return g.db
 
     @app.teardown_appcontext
@@ -133,6 +143,21 @@ def create_app(database_path=None, config=None):
             "script-src 'self' 'unsafe-inline'; frame-ancestors 'none'"
         )
         return response
+
+    # Per-process, which is per gunicorn worker, so the real ceiling is this
+    # times the worker count. Good enough: a 32 byte token is not guessable and
+    # this exists to stop the route being a free oracle, not to be exact.
+    redeem_hits = {}
+
+    def rate_limited(key, now, limit=RATE_LIMIT, window=RATE_WINDOW) -> bool:
+        cutoff = now - window
+        hits = [t for t in redeem_hits.get(key, []) if t > cutoff]
+        hits.append(now)
+        redeem_hits[key] = hits
+        if len(redeem_hits) > 2048:            # crude bound on memory
+            for stale in [k for k, v in redeem_hits.items() if not v or v[-1] < cutoff]:
+                redeem_hits.pop(stale, None)
+        return len(hits) > limit
 
     # -- authentication ---------------------------------------------------
 
@@ -172,6 +197,9 @@ def create_app(database_path=None, config=None):
         identical page: never distinguish the cases.
         """
         now = datetime.now(timezone.utc)
+        if rate_limited(request.remote_addr or "unknown", now):
+            return render_template("expired.html"), 429
+
         row = db().execute(
             "SELECT * FROM config_tokens WHERE token = ?", (token,)
         ).fetchone()
@@ -255,7 +283,9 @@ def create_app(database_path=None, config=None):
         did = current_did()
         if not did:
             return render_template("expired.html"), 403
-        if request.form.get("csrf") != session.get("csrf"):
+        submitted = request.form.get("csrf") or ""
+        expected = session.get("csrf") or ""
+        if not secrets.compare_digest(submitted, expected):
             abort(400)
 
         tz = request.form.get("tz") or ""
@@ -330,7 +360,12 @@ def create_app(database_path=None, config=None):
                 "", 401, {"WWW-Authenticate": 'Basic realm="sportscrawl"'}
             )
 
-        floor = int(config.get("ADMIN_MIN_BUCKET") or stats.MIN_BUCKET)
+        try:
+            floor = int(config.get("ADMIN_MIN_BUCKET") or stats.MIN_BUCKET)
+        except (TypeError, ValueError):
+            # A typo in the env file must not take the page down, and it must
+            # never fail open to a smaller floor.
+            floor = stats.MIN_BUCKET
         return render_template("admin.html", data=stats.summary(db(), floor=floor))
 
     @app.route("/")

@@ -89,9 +89,22 @@ class CommandHandler:
     # -- helpers ----------------------------------------------------------
 
     def _config_link(self, did, now, scope="config"):
+        """A fresh link. Invalidates any previous one, per section 9."""
         token = secrets.token_urlsafe(32)
         repo.issue_token(self._db, did, token, scope, now + TOKEN_TTL)
         return "%s/c/%s" % (self._base, token)
+
+    def _reusable_link(self, did, now):
+        """A link for the help reply, reusing a live token when there is one.
+
+        `config` is an explicit request and always mints fresh. Help is not:
+        someone who asks for a link and then says "thanks" would otherwise have
+        the link they were just sent invalidated by their own pleasantry.
+        """
+        existing = repo.live_token(self._db, did, "config", now)
+        if existing:
+            return "%s/c/%s" % (self._base, existing)
+        return self._config_link(did, now)
 
     def _help_reply(self, convo_id, did, now):
         """First unknown message gets full help; a repeat inside the hour gets
@@ -103,7 +116,7 @@ class CommandHandler:
         in-memory counter.
         """
         previous = repo.help_sent_at(self._db, convo_id)
-        link = self._config_link(did, now)
+        link = self._reusable_link(did, now)
         repo.set_help_sent(self._db, convo_id, now)
 
         if previous and previous > repo.utc_string(now - HELP_THROTTLE):

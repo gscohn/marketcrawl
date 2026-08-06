@@ -429,3 +429,63 @@ def test_the_footer_links_to_the_source_repository(env):
         page = client.get(path).data.decode("utf-8")
         assert "Source Code:" in page, path
         assert "https://github.com/cruftbox/sportscrawl" in page, path
+
+
+# --------------------------------------------------------------------------
+# Rate limiting and migration hygiene
+# --------------------------------------------------------------------------
+
+
+def test_the_capability_route_is_rate_limited(env):
+    """Spec section 10 asks for it. A 32 byte token is not guessable, so this
+    is about the route not being a free oracle."""
+    app, db, now = env
+    client = app.test_client()
+    token = mint(db, now)
+
+    codes = [client.get("/c/%s" % token).status_code for _ in range(30)]
+    assert 429 in codes
+    assert codes[0] != 429            # ordinary use is unaffected
+
+
+def test_a_rate_limited_response_looks_like_every_other_refusal(env):
+    app, db, now = env
+    client = app.test_client()
+    for _ in range(30):
+        reply = client.get("/c/nonsense")
+    assert reply.status_code in (404, 429)
+    assert b"expired" in reply.data.lower()
+
+
+def test_migrations_do_not_run_on_every_request(env, tmp_path):
+    """open_database() migrates; calling it per request re-globbed the
+    migrations directory on every page load and let a worker race a deploy."""
+    app, _, _ = env
+    calls = []
+
+    import sportscrawl.db as dbmod
+    original = dbmod.migrate
+    dbmod.migrate = lambda *a, **k: calls.append(1) or []
+    try:
+        client = app.test_client()
+        client.get("/privacy")
+        client.get("/")
+    finally:
+        dbmod.migrate = original
+
+    assert calls == []
+
+
+def test_a_bad_admin_floor_does_not_break_the_page_or_widen_it(env):
+    """A typo in the env file must not 500, and must never fail open."""
+    path = str(env[0].config["DATABASE_PATH"])
+    app = create_app(path, {"FLASK_SECRET_KEY": "t", "EVENTS_PEPPER": PEPPER,
+                            "ADMIN_PASSWORD": "pw", "ADMIN_MIN_BUCKET": "banana",
+                            "DATABASE_PATH": path})
+    app.config["SESSION_COOKIE_SECURE"] = False
+    import base64
+    header = base64.b64encode(b"admin:pw").decode()
+    reply = app.test_client().get("/admin", headers={"Authorization": "Basic %s" % header})
+    assert reply.status_code == 200
+    # Fell back to the default floor rather than widening it or crashing.
+    assert b"Buckets smaller than 5" in reply.data

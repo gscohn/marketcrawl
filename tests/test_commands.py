@@ -269,17 +269,32 @@ def test_admin_from_anyone_else_looks_like_an_unknown_word(db, handler):
 
 
 class FakeClient:
-    def __init__(self, convos, messages):
+    """Pages like the real API: newest first, one page at a time."""
+
+    def __init__(self, convos, messages, page_size=50):
         self.convos = convos
         self.messages = messages
+        self.page_size = page_size
         self.sent = []
         self.read = []
+        self.convo_pages = 0
 
-    def list_convos(self, **kwargs):
-        return {"convos": self.convos}
+    def list_convos(self, cursor=None, **kwargs):
+        start = int(cursor or 0)
+        page = self.convos[start:start + self.page_size]
+        self.convo_pages += 1
+        nxt = start + self.page_size
+        return {"convos": page,
+                "cursor": str(nxt) if nxt < len(self.convos) else None}
 
-    def get_messages(self, convo_id, **kwargs):
-        return {"messages": self.messages.get(convo_id, [])}
+    def get_messages(self, convo_id, cursor=None, **kwargs):
+        allm = sorted(self.messages.get(convo_id, []),
+                      key=lambda m: m["id"], reverse=True)
+        start = int(cursor or 0)
+        page = allm[start:start + self.page_size]
+        nxt = start + self.page_size
+        return {"messages": page,
+                "cursor": str(nxt) if nxt < len(allm) else None}
 
     def send_message(self, convo_id, text):
         self.sent.append((convo_id, text))
@@ -410,3 +425,86 @@ def test_a_backlog_after_downtime_is_still_handled(db, handler):
 
     report = Poller(db, client, handler).poll(NOW)
     assert report.handled == 1
+
+
+def test_a_pleasantry_does_not_kill_the_link_just_sent(db, handler):
+    """Ask for config, say thanks, tap the link. Minting a fresh token on
+    every unrecognised message invalidated the one they were about to use."""
+    first = handler.handle(msg("config"), NOW)
+    link = first.split("\n")[1]
+
+    handler.handle(msg("thanks!", message_id="m2"), NOW + timedelta(seconds=30))
+
+    tokens = [r["token"] for r in db.execute("SELECT token FROM config_tokens")]
+    assert link.rsplit("/", 1)[-1] in tokens
+
+
+def test_config_still_mints_a_fresh_link_every_time(db, handler):
+    """An explicit request invalidates the previous one, per section 9."""
+    first = handler.handle(msg("config"), NOW).split("\n")[1]
+    second = handler.handle(msg("config", message_id="m2"),
+                            NOW + timedelta(minutes=1)).split("\n")[1]
+
+    assert first != second
+    tokens = [r["token"] for r in db.execute("SELECT token FROM config_tokens")]
+    assert tokens == [second.rsplit("/", 1)[-1]]
+
+
+def test_an_expired_token_is_not_reused_for_help(db, handler):
+    handler.handle(msg("config"), NOW)
+    later = NOW + timedelta(hours=2)
+    reply = handler.handle(msg("what is this", message_id="m2"), later)
+
+    fresh = reply.split("/c/")[1].split()[0].strip()
+    row = db.execute("SELECT expires_at FROM config_tokens WHERE token = ?",
+                     (fresh,)).fetchone()
+    assert row is not None and row["expires_at"] > repo.utc_string(later)
+
+
+def test_conversations_beyond_the_first_page_are_polled(db, handler):
+    """listConvos returns 50 at a time. Without paging, subscriber 51 onward
+    is never read: their stop and delete are silently ignored."""
+    convos = [{"id": "c%d" % i, "unreadCount": 0} for i in range(60)]
+    convos[55] = {"id": "c55", "unreadCount": 1}
+    client = FakeClient(convos, {"c55": [raw("m1", "stop", did=DID)]})
+    repo.create_subscriber(db, DID, NOW, PEPPER)
+
+    report = Poller(db, client, handler).poll(NOW)
+
+    assert report.conversations == 60
+    assert report.handled == 1
+    assert repo.get_subscriber(db, DID)["state"] == "paused"
+
+
+def test_messages_beyond_the_first_page_are_read(db, handler):
+    """More than a page of messages between polls would otherwise be dropped
+    while the cursor jumped past them."""
+    msgs = [raw("m%03d" % i, "hello", did=DID) for i in range(60)]
+    msgs.append(raw("m999", "stop", did=DID))
+    client = FakeClient([{"id": CONVO, "unreadCount": 1}], {CONVO: msgs},
+                        page_size=25)
+    repo.create_subscriber(db, DID, NOW, PEPPER)
+
+    Poller(db, client, handler).poll(NOW)
+
+    assert repo.get_subscriber(db, DID)["state"] == "paused"
+    assert repo.last_message_id(db, CONVO) == "m999"
+
+
+def test_one_broken_conversation_does_not_starve_the_others(db, handler):
+    """The scheduler already isolates per subscriber; the poller did not."""
+    class Breaking(FakeClient):
+        def get_messages(self, convo_id, cursor=None, **kwargs):
+            if convo_id == "bad":
+                raise RuntimeError("this convo is cursed")
+            return super().get_messages(convo_id, cursor=cursor, **kwargs)
+
+    client = Breaking(
+        [{"id": "bad", "unreadCount": 1}, {"id": CONVO, "unreadCount": 1}],
+        {CONVO: [raw("m1", "hello", did=DID)]},
+    )
+    report = Poller(db, client, handler).poll(NOW)
+
+    assert report.errors == 1
+    assert report.handled == 1
+    assert len(client.sent) == 1

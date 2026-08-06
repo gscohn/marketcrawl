@@ -25,6 +25,16 @@ def connect(path: str) -> sqlite3.Connection:
     return connection
 
 
+def _statements(sql: str) -> list:
+    """Split a migration into executable statements, dropping comments."""
+    lines = [
+        line for line in sql.splitlines()
+        if not line.strip().startswith("--")
+    ]
+    joined = "\n".join(lines)
+    return [part.strip() for part in joined.split(";") if part.strip()]
+
+
 def migrate(connection: sqlite3.Connection, migrations_dir=None) -> list:
     """Apply pending numbered migrations. Safe to run twice.
 
@@ -50,22 +60,26 @@ def migrate(connection: sqlite3.Connection, migrations_dir=None) -> list:
             pending.append((version, path))
 
     for version, path in pending:
-        # No explicit BEGIN around this. executescript() issues an implicit
-        # COMMIT before it runs, so wrapping it in a transaction leaves
-        # nothing to commit and the rollback path then masks the real error.
+        # Statement at a time rather than executescript, so a tolerated error
+        # skips one statement instead of the remainder of the file. The old
+        # form recorded a migration as applied after silently abandoning
+        # everything below a duplicate column.
         #
-        # Atomicity comes from the migrations themselves instead: every one is
-        # written IF NOT EXISTS and must be safe to run twice (spec section
-        # 13). A script that dies halfway leaves its version unrecorded, so
-        # the next deploy re-runs it and finishes the job.
-        try:
-            connection.executescript(path.read_text(encoding="utf-8"))
-        except sqlite3.OperationalError as exc:
-            # SQLite has no ADD COLUMN IF NOT EXISTS. A migration that only
-            # adds a column is still safe to run twice, so a duplicate column
-            # is treated as already applied rather than a failure.
-            if "duplicate column name" not in str(exc):
-                raise
+        # No explicit transaction. Atomicity comes from the migrations
+        # themselves: every one is written IF NOT EXISTS and must be safe to
+        # run twice (spec section 13), so a script that dies halfway leaves
+        # its version unrecorded and the next deploy finishes the job.
+        #
+        # This splits on semicolons, so a migration containing a trigger or any
+        # other body with embedded semicolons needs a different runner.
+        for statement in _statements(path.read_text(encoding="utf-8")):
+            try:
+                connection.execute(statement)
+            except sqlite3.OperationalError as exc:
+                # SQLite has no ADD COLUMN IF NOT EXISTS, and every migration
+                # must be safe to run twice, so this one case is expected.
+                if "duplicate column name" not in str(exc):
+                    raise
         connection.execute(
             "INSERT INTO schema_version (version, applied_at)"
             " VALUES (?, datetime('now'))",

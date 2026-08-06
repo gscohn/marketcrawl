@@ -96,29 +96,63 @@ def delivery_times(db, floor=MIN_BUCKET) -> list:
     return [{"time": r["send_time"], "count": _suppress(r["n"], floor)} for r in rows]
 
 
-def retention(db, windows=(7, 30, 90)) -> list:
-    """Of the people who signed up at least N days ago, how many are still here.
+def retention(db, windows=(7, 30, 90), now=None) -> list:
+    """Of the people who signed up at least N days ago, how many were still
+    subscribed N days after their own signup.
 
-    Unrecoverable from current state: a subscriber who deleted leaves no row to
-    count, which is why the events table outlives deletion.
+    Cohort retention, anchored to each subject's signup rather than to today.
+    An earlier version counted any pause or delete at any time, with no window
+    and no check for a later resume, so somebody who paused in February and
+    came back in March was churned forever, somebody who signed up sixty days
+    ago and paused yesterday counted against the 7 day figure, and all three
+    windows converged on the same number.
+
+    Computed in Python rather than SQL. The events table is small, and the
+    "was this subject paused at a given instant" question needs the pause and
+    resume history in order, which is unreadable as a correlated subquery.
     """
-    now = datetime.now(timezone.utc)
+    now = now or datetime.now(timezone.utc)
+
+    history = {}
+    for row in db.execute(
+        "SELECT subject, event_type, ts FROM events"
+        " WHERE event_type IN ('signup', 'pause', 'resume', 'delete')"
+        " ORDER BY ts, id"
+    ):
+        history.setdefault(row["subject"], []).append((row["ts"], row["event_type"]))
+
     out = []
     for days in windows:
-        cutoff = (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        cohort = db.execute(
-            "SELECT COUNT(DISTINCT subject) FROM events"
-            " WHERE event_type = 'signup' AND ts <= ?",
-            (cutoff,),
-        ).fetchone()[0]
-        churned = db.execute(
-            "SELECT COUNT(DISTINCT subject) FROM events e"
-            " WHERE e.event_type IN ('delete', 'pause')"
-            "   AND EXISTS (SELECT 1 FROM events s WHERE s.subject = e.subject"
-            "               AND s.event_type = 'signup' AND s.ts <= ?)",
-            (cutoff,),
-        ).fetchone()[0]
-        retained = max(cohort - churned, 0)
+        cohort = 0
+        retained = 0
+        horizon = (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        for events in history.values():
+            signup = next((ts for ts, kind in events if kind == "signup"), None)
+            if signup is None or signup > horizon:
+                continue          # joined too recently to have reached day N
+            cohort += 1
+
+            anniversary = (
+                datetime.strptime(signup, "%Y-%m-%dT%H:%M:%SZ")
+                .replace(tzinfo=timezone.utc) + timedelta(days=days)
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            # Replay their history up to their own day N. Paused counts as
+            # churned only if they had not resumed by then.
+            subscribed = False
+            for ts, kind in events:
+                if ts > anniversary:
+                    break
+                if kind == "signup" or kind == "resume":
+                    subscribed = True
+                elif kind == "pause":
+                    subscribed = False
+                elif kind == "delete":
+                    subscribed = False
+            if subscribed:
+                retained += 1
+
         out.append({
             "days": days,
             "cohort": cohort,

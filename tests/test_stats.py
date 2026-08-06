@@ -94,3 +94,75 @@ def test_summary_runs_on_an_empty_database(db):
     data = stats.summary(db)
     assert data["states"] == {"active": 0, "paused": 0, "deleted": 0}
     assert data["retention"][0]["pct"] is None
+
+
+# --------------------------------------------------------------------------
+# Cohort retention
+# --------------------------------------------------------------------------
+
+
+def at(days_ago, hours=0):
+    return NOW - timedelta(days=days_ago, hours=hours)
+
+
+def event(db, did, kind, when):
+    repo.record_event(db, when, kind, did, PEPPER)
+
+
+def test_someone_who_paused_and_came_back_is_retained(db):
+    """The old query counted any pause forever, so a February pause and a
+    March resume read as churn for the rest of time."""
+    event(db, "did:plc:a", "signup", at(60))
+    event(db, "did:plc:a", "pause", at(50))
+    event(db, "did:plc:a", "resume", at(45))
+
+    thirty = next(r for r in stats.retention(db, now=NOW) if r["days"] == 30)
+    assert thirty["cohort"] == 1
+    assert thirty["retained"] == 1
+
+
+def test_a_pause_after_the_window_does_not_count_against_it(db):
+    """Signed up 60 days ago, paused yesterday. Still retained at day 7."""
+    event(db, "did:plc:b", "signup", at(60))
+    event(db, "did:plc:b", "pause", at(1))
+
+    result = {r["days"]: r for r in stats.retention(db, now=NOW)}
+    assert result[7]["retained"] == 1
+    assert result[30]["retained"] == 1
+
+
+def test_a_pause_inside_the_window_does_count(db):
+    event(db, "did:plc:c", "signup", at(60))
+    event(db, "did:plc:c", "pause", at(57))
+
+    result = {r["days"]: r for r in stats.retention(db, now=NOW)}
+    assert result[7]["retained"] == 0
+    assert result[30]["retained"] == 0
+
+
+def test_someone_too_new_is_not_in_the_cohort(db):
+    """They have not reached day 30 yet, so counting them would drag the rate
+    down for no reason."""
+    event(db, "did:plc:d", "signup", at(3))
+
+    result = {r["days"]: r for r in stats.retention(db, now=NOW)}
+    assert result[7]["cohort"] == 0
+    assert result[30]["cohort"] == 0
+
+
+def test_a_deletion_inside_the_window_is_churn(db):
+    event(db, "did:plc:e", "signup", at(40))
+    event(db, "did:plc:e", "delete", at(38))
+
+    thirty = next(r for r in stats.retention(db, now=NOW) if r["days"] == 30)
+    assert thirty["cohort"] == 1 and thirty["retained"] == 0
+
+
+def test_the_windows_can_differ(db):
+    """The old query made 7, 30 and 90 report the same thing."""
+    event(db, "did:plc:f", "signup", at(100))
+    event(db, "did:plc:f", "pause", at(80))      # day 20 of their life
+
+    result = {r["days"]: r for r in stats.retention(db, now=NOW)}
+    assert result[7]["retained"] == 1            # still there at day 7
+    assert result[30]["retained"] == 0           # gone by day 30

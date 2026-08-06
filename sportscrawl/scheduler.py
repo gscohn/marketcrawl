@@ -137,6 +137,17 @@ class Scheduler:
 
     def tick(self, now: datetime) -> TickReport:
         report = TickReport()
+        try:
+            self._run(now, report)
+        finally:
+            # Every exit path, not just the one where somebody was due. An
+            # earlier version returned early on a quiet tick, so a failing
+            # confirmation loop never alerted and the consecutive counter was
+            # never reset: three failures hours apart read as three in a row.
+            self._maybe_alert(report, now)
+        return report
+
+    def _run(self, now: datetime, report: TickReport) -> None:
         self._send_confirmations(now, report)
         rows = repo.deliverable_subscribers(self._db)
 
@@ -152,7 +163,7 @@ class Scheduler:
                 due.append(candidate)
 
         if not due:
-            return report
+            return
 
         window = self._source.fetch_window(self._leagues, now)
         for health in self._source.health.values():
@@ -174,9 +185,6 @@ class Scheduler:
                 self._last_error = "%s" % exc
                 print("send failed for %s: %s" % (candidate.did, exc), flush=True)
             self._sleep(self._gap)
-
-        self._maybe_alert(report, now)
-        return report
 
     def _maybe_alert(self, report, now) -> None:
         """Tell the operator when deliveries keep failing.

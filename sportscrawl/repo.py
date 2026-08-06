@@ -289,3 +289,20 @@ def clear_confirmation(connection, did):
     connection.execute(
         "UPDATE subscribers SET confirm_pending_at = NULL WHERE did = ?", (did,)
     )
+
+
+def live_token(connection, did, scope, now):
+    """An existing token with life left, or None.
+
+    The help reply reuses one rather than minting. issue_token deletes prior
+    tokens, so minting on every unrecognised message killed the link the
+    subscriber had just been sent: ask for `config`, say "thanks", tap the
+    link, get the expired page.
+    """
+    row = connection.execute(
+        "SELECT token FROM config_tokens"
+        " WHERE did = ? AND scope = ? AND expires_at > ?"
+        " ORDER BY expires_at DESC LIMIT 1",
+        (did, scope, utc_string(now)),
+    ).fetchone()
+    return row["token"] if row else None

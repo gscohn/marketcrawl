@@ -618,3 +618,58 @@ def test_a_broken_morning_does_not_become_sixty_dms(db):
         engine.tick(utc(2026, 8, 4, 14, minute))
 
     assert len(sender.alerts) == 1
+
+
+def test_a_failing_confirmation_alerts_even_when_nobody_is_due(db):
+    """tick() used to return early on a quiet tick, before the alert ran, so a
+    broken confirmation loop was as silent as the outage it was built for."""
+    add_subscriber(db, send_time="07:00")
+    repo.queue_confirmation(db, DID, utc(2026, 8, 4, 20, 0))
+
+    class Failing:
+        def __init__(self):
+            self.alerts = []
+
+        def __call__(self, did, text):
+            if did == ADMIN:
+                self.alerts.append(text)
+                return
+            raise RuntimeError("confirmation transport down")
+
+    sender = Failing()
+    engine = alerting_scheduler(db, FakeSource(), sender)
+    for minute in range(3):
+        engine.tick(utc(2026, 8, 4, 20, minute))     # 13:00 local, nobody due
+
+    assert len(sender.alerts) == 1
+    assert "confirmation transport down" in sender.alerts[0]
+
+
+def test_the_failing_counter_resets_on_a_clean_quiet_tick(db):
+    """Otherwise failures hours apart are reported as consecutive."""
+    add_subscriber(db, send_time="07:00")
+    repo.queue_confirmation(db, DID, utc(2026, 8, 4, 20, 0))
+
+    class Sometimes:
+        def __init__(self):
+            self.alerts = []
+            self.fail = True
+
+        def __call__(self, did, text):
+            if did == ADMIN:
+                self.alerts.append(text)
+                return
+            if self.fail:
+                raise RuntimeError("down")
+
+    sender = Sometimes()
+    engine = alerting_scheduler(db, FakeSource(), sender)
+    engine.tick(utc(2026, 8, 4, 20, 0))
+    engine.tick(utc(2026, 8, 4, 20, 1))
+    sender.fail = False
+    engine.tick(utc(2026, 8, 4, 20, 2))      # confirmation succeeds, resets
+    sender.fail = True
+    repo.queue_confirmation(db, DID, utc(2026, 8, 4, 20, 3))
+    engine.tick(utc(2026, 8, 4, 20, 3))
+
+    assert sender.alerts == []
