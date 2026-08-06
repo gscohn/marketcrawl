@@ -302,7 +302,8 @@ def test_small_buckets_are_suppressed(env):
     page = admin_session(app, db, now).get("/admin").data.decode("utf-8")
 
     assert "Dodgers" in page          # the row exists
-    assert "fewer than 5" in page     # but the count is withheld
+    assert "&lt;5" in page            # but the count is withheld
+    assert "withheld" in page
 
 
 def test_an_admin_token_lands_on_the_admin_page(env):

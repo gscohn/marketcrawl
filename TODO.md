@@ -56,9 +56,10 @@ ended.
       auto-expanding. A returning subscriber with picks in every league gets all
       eight drawers open and loads all 205 crests — about 208 requests against
       3 for a new subscriber.
-- [ ] `MIN_BUCKET` suppression makes the admin page mostly dashes at current
-      scale. `ADMIN_MIN_BUCKET` can lower it for testing; decide whether that
-      stays.
+- [ ] **Restore `ADMIN_MIN_BUCKET=5` before the tester group grows.** It is
+      set to 1 while the subscriber base is small enough that every number is
+      one Michael already knows. At five or more people the floor is the only
+      thing stopping a count of 1 next to a team name identifying somebody.
 - [ ] Bootstrap is 232KB and now dominates first paint. A subset would cut most
       of it, at the cost of a build step this project does not have.
 - [x] Backup: nightly pull to bandersnatch, done. See docs/BACKUP.md.

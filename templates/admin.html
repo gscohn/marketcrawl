@@ -3,7 +3,7 @@
 {% block navnote %}admin{% endblock %}
 
 {% macro cell(value) -%}
-  {%- if value is none %}<span class="text-body-secondary" title="fewer than {{ data.floor }}">n/a</span>{% else %}{{ value }}{% endif -%}
+  {%- if value is none %}<span class="text-body-secondary" title="between 1 and {{ data.floor - 1 }}, withheld">&lt;{{ data.floor }}</span>{% else %}{{ value }}{% endif -%}
 {%- endmacro %}
 
 {% block content %}
@@ -11,8 +11,11 @@
 <p class="text-body-secondary small">
   Aggregates only. There is no subscriber list, by design: if the page cannot
   show individual rows, the privacy claim stays true without relying on
-  discipline. Buckets smaller than {{ data.floor }} show as n/a rather than
-  identifying someone by arithmetic. For one subscriber's digest, use the CLI.
+  discipline. Buckets smaller than {{ data.floor }} show as
+  &lt;{{ data.floor }} rather than identifying someone by arithmetic. Set
+  ADMIN_MIN_BUCKET to lower the floor while the subscriber base is small
+  enough that every number is one you already know. For one subscriber's
+  digest, use the CLI.
 </p>
 
 <div class="row g-3 mb-4">
