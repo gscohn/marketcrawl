@@ -27,13 +27,14 @@ from sportscrawl.watchdog import Liveness
 TICK_SECONDS = 60
 
 
-def build(database_path: str, pepper: str, sender=None) -> Scheduler:
+def build(database_path: str, pepper: str, sender=None, alert_did=None) -> Scheduler:
     return Scheduler(
         connection=open_database(database_path),
         source=EspnSource(),
         leagues=list(US_PRO_LEAGUES) + list(SOCCER_LEAGUES_AT_LAUNCH),
         pepper=pepper,
         sender=sender or stdout_sender,
+        alert_did=alert_did,
     )
 
 
@@ -98,7 +99,8 @@ def main(argv=None) -> int:
         print("EVENTS_PEPPER is not set", file=sys.stderr)
         return 2
 
-    scheduler = build(args.database, pepper, sender=sender)
+    scheduler = build(args.database, pepper, sender=sender,
+                      alert_did=config.get("ADMIN_DID"))
 
     live = Liveness("scheduler")
     if not args.once:

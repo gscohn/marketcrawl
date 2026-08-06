@@ -10,12 +10,20 @@ what the atproto-proxy header does. Without it the calls 404.
 
 from __future__ import annotations
 
+import base64
+import json
 import re
+import time
 from dataclasses import dataclass
 
 from .http import CONNECT_TIMEOUT, READ_TIMEOUT, USER_AGENT, FetchError
 
 PLC_DIRECTORY = "https://plc.directory"
+
+# Refresh this long before the token actually lapses. Measured 2026-08-06: an
+# accessJwt from createSession lives exactly 2 hours. Refreshing early turns a
+# guaranteed failure every two hours into an ordinary call.
+TOKEN_REFRESH_MARGIN = 300
 CHAT_PROXY = "did:web:api.bsky.chat#bsky_chat"
 
 
@@ -121,6 +129,20 @@ class Unauthorized(Exception):
     """The access token was rejected. Recoverable by logging in again."""
 
 
+def token_expiry(jwt: str):
+    """Read the `exp` claim. Returns None if it cannot be parsed.
+
+    Not verifying the signature, just reading a public claim to know when to
+    log in again. Unparseable means fall back to the reactive path.
+    """
+    try:
+        payload = jwt.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        return json.loads(base64.urlsafe_b64decode(payload))["exp"]
+    except Exception:
+        return None
+
+
 class ChatClient:
     def __init__(self, identifier: str, app_password: str, transport=None, pds=None):
         self._identifier = identifier
@@ -128,6 +150,7 @@ class ChatClient:
         self._transport = transport or requests_transport
         self._pds = pds
         self._access = None
+        self._expires_at = None
         self.did = None
 
     # -- session ----------------------------------------------------------
@@ -149,11 +172,19 @@ class ChatClient:
             {"identifier": self._identifier, "password": self._password},
         )
         self._access = session["accessJwt"]
+        self._expires_at = token_expiry(self._access)
         self.did = session["did"]
         return self.did
 
+    def _expired(self) -> bool:
+        if self._expires_at is None:
+            return False
+        return time.time() >= self._expires_at - TOKEN_REFRESH_MARGIN
+
     def _headers(self) -> dict:
-        if self._access is None:
+        if self._access is None or self._expired():
+            # Proactive. The reactive path below still exists, because a token
+            # can be revoked or invalidated before its stated expiry.
             self.login()
         return {
             "User-Agent": USER_AGENT,

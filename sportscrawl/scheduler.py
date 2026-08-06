@@ -37,6 +37,12 @@ FAILURE_GRACE = timedelta(minutes=10)
 # seconds is invisible to recipients and stays clear of chat rate limits.
 SEND_GAP_SECONDS = 0.5
 
+# Consecutive failing ticks before the operator is told, and how long before
+# saying it again. Three minutes of failure is a real fault, not a blip; an
+# hour of quiet after that stops a broken morning becoming sixty DMs.
+ALERT_AFTER_TICKS = 3
+ALERT_COOLDOWN = timedelta(hours=1)
+
 NOT_DUE = "not_due"
 DUE = "due"
 DEFER = "defer"
@@ -115,6 +121,7 @@ class Scheduler:
         sender=stdout_sender,
         sleep=time.sleep,
         gap=SEND_GAP_SECONDS,
+        alert_did=None,
     ):
         self._db = connection
         self._source = source
@@ -123,6 +130,10 @@ class Scheduler:
         self._send = sender
         self._sleep = sleep
         self._gap = gap
+        self._alert_did = alert_did
+        self._failing_ticks = 0
+        self._last_error = ""
+        self._alerted_at = None
 
     def tick(self, now: datetime) -> TickReport:
         report = TickReport()
@@ -160,10 +171,45 @@ class Scheduler:
                 # is retried on the next tick while they are still inside the
                 # lateness window, and dropped quietly once past it.
                 report.errors += 1
-                print("send failed for %s: %s" % (candidate.did, exc))
+                self._last_error = "%s" % exc
+                print("send failed for %s: %s" % (candidate.did, exc), flush=True)
             self._sleep(self._gap)
 
+        self._maybe_alert(report, now)
         return report
+
+    def _maybe_alert(self, report, now) -> None:
+        """Tell the operator when deliveries keep failing.
+
+        Two silent outages happened before this existed. Both were found by a
+        subscriber noticing a missing digest, because a loop that ticks
+        healthily while failing every send looks identical to a quiet morning.
+        """
+        if not report.errors:
+            self._failing_ticks = 0
+            return
+
+        self._failing_ticks += 1
+        if self._failing_ticks < ALERT_AFTER_TICKS or not self._alert_did:
+            return
+        if self._alerted_at and now - self._alerted_at < ALERT_COOLDOWN:
+            return
+
+        text = "\n".join([
+            "SportsCrawl alert",
+            "",
+            "Digest delivery has failed on %d consecutive ticks." % self._failing_ticks,
+            "",
+            self._last_error or "no detail captured",
+        ])
+        try:
+            self._send(self._alert_did, text)
+            self._alerted_at = now
+            print("alert sent to operator", flush=True)
+        except Exception as exc:
+            # The alert uses the same transport that is failing, so this is
+            # expected during a total outage. Never let it mask the original.
+            print("alert could not be sent: %s" % exc, flush=True)
 
     def _send_confirmations(self, now, report) -> None:
         """Tell someone their settings took, and when to expect the first
@@ -190,6 +236,7 @@ class Scheduler:
                 report.confirmations += 1
             except Exception as exc:
                 report.errors += 1
+                self._last_error = "%s" % exc
                 print("confirmation failed for %s: %s" % (row["did"], exc), flush=True)
 
     def _deliver(self, candidate, window, now, report) -> None:

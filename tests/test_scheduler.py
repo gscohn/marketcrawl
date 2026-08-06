@@ -504,3 +504,117 @@ def test_a_confirmation_does_not_block_the_digest_batch(db):
 
     assert report.errors == 1                      # the confirmation failed
     assert any(did == "did:plc:digest" for did, _ in sender.sent)
+
+
+# --------------------------------------------------------------------------
+# Alerting on repeated failure
+# --------------------------------------------------------------------------
+
+
+ADMIN = "did:plc:operator"
+
+
+def alerting_scheduler(db, source, sender):
+    return Scheduler(db, source, [MLB], PEPPER, sender=sender,
+                     sleep=lambda _: None, gap=0, alert_did=ADMIN)
+
+
+def test_repeated_failures_alert_the_operator(db):
+    """Two silent outages happened before this existed, both found by a
+    subscriber noticing a missing digest."""
+    add_subscriber(db)
+    repo.add_sub(db, DID, "team", MLB, "100")
+
+    class Failing:
+        def __init__(self):
+            self.sent = []
+
+        def __call__(self, did, text):
+            if did == ADMIN:
+                self.sent.append((did, text))
+                return
+            raise RuntimeError('{"error":"ExpiredToken"}')
+
+    sender = Failing()
+    engine = alerting_scheduler(db, FakeSource(events=[final()]), sender)
+
+    for minute in range(3):
+        engine.tick(utc(2026, 8, 4, 14, minute))
+
+    assert len(sender.sent) == 1
+    alert = sender.sent[0][1]
+    assert "3 consecutive ticks" in alert
+    assert "ExpiredToken" in alert          # the reason, not just the fact
+
+
+def test_one_or_two_failures_do_not_alert(db):
+    """A blip is not a fault."""
+    add_subscriber(db)
+    repo.add_sub(db, DID, "team", MLB, "100")
+
+    class Failing:
+        def __init__(self):
+            self.sent = []
+
+        def __call__(self, did, text):
+            if did == ADMIN:
+                self.sent.append((did, text))
+                return
+            raise RuntimeError("transient")
+
+    sender = Failing()
+    engine = alerting_scheduler(db, FakeSource(events=[final()]), sender)
+    engine.tick(utc(2026, 8, 4, 14, 0))
+    engine.tick(utc(2026, 8, 4, 14, 1))
+
+    assert sender.sent == []
+
+
+def test_a_recovery_resets_the_counter(db):
+    add_subscriber(db)
+    repo.add_sub(db, DID, "team", MLB, "100")
+
+    state = {"fail": True}
+
+    class Flaky:
+        def __init__(self):
+            self.sent = []
+
+        def __call__(self, did, text):
+            if did == ADMIN:
+                self.sent.append((did, text))
+                return
+            if state["fail"]:
+                raise RuntimeError("nope")
+            self.sent.append((did, text))
+
+    sender = Flaky()
+    engine = alerting_scheduler(db, FakeSource(events=[final()]), sender)
+    engine.tick(utc(2026, 8, 4, 14, 0))
+    engine.tick(utc(2026, 8, 4, 14, 1))
+    state["fail"] = False
+    engine.tick(utc(2026, 8, 4, 14, 2))       # succeeds, counter resets
+
+    assert not any(did == ADMIN for did, _ in sender.sent)
+
+
+def test_a_broken_morning_does_not_become_sixty_dms(db):
+    add_subscriber(db)
+    repo.add_sub(db, DID, "team", MLB, "100")
+
+    class Failing:
+        def __init__(self):
+            self.alerts = []
+
+        def __call__(self, did, text):
+            if did == ADMIN:
+                self.alerts.append(text)
+                return
+            raise RuntimeError("still broken")
+
+    sender = Failing()
+    engine = alerting_scheduler(db, FakeSource(events=[final()]), sender)
+    for minute in range(40):
+        engine.tick(utc(2026, 8, 4, 14, minute))
+
+    assert len(sender.alerts) == 1
