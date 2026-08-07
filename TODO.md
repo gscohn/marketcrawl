@@ -3,12 +3,12 @@
 Outstanding work, roughly in the order it should happen. The spec is the
 design; this is what has not been built or decided yet.
 
-## Before testers
+## Live since 2026-08-07
 
-- [ ] **Watch one clean send.** The first unattended run stalled silently; the
-      heartbeat and watchdog went in afterwards but have not yet proven
-      themselves through a morning. Next fire is 05:30 America/Los_Angeles.
-- [ ] Ten known testers, two weeks, before any public post (spec section 16).
+- [x] **Watch one clean send.** Done 2026-08-07: 05:30 and 07:00 Pacific both
+      delivered, errors=0, no restarts, process up 29 hours across roughly
+      fourteen token expiries.
+- [x] Public post published 2026-08-07, repo made public the same day.
 
 ## Women's World Cup 2027
 
@@ -56,10 +56,13 @@ ended.
       auto-expanding. A returning subscriber with picks in every league gets all
       eight drawers open and loads all 205 crests — about 208 requests against
       3 for a new subscriber.
-- [ ] **Restore `ADMIN_MIN_BUCKET=5` before the tester group grows.** It is
-      set to 1 while the subscriber base is small enough that every number is
-      one Michael already knows. At five or more people the floor is the only
-      thing stopping a count of 1 next to a team name identifying somebody.
+- [ ] Revisit `ADMIN_MIN_BUCKET` when the page is worth reading. It is 1, and
+      that is a considered choice, not an oversight: the admin page shows counts
+      and never names, there is no subscriber list view, and the operator has
+      direct database access anyway. The floor only starts protecting anything
+      once there are enough subscribers for a screenshot to confirm somebody's
+      choices to a third party, which is roughly the same point at which the
+      numbers become worth looking at.
 - [ ] Bootstrap is 232KB and now dominates first paint. A subset would cut most
       of it, at the cost of a build step this project does not have.
 - [x] Backup: nightly pull to bandersnatch, done. See docs/BACKUP.md.
