@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime, timezone
 
 from sportscrawl.config import settings
 from sportscrawl.db import open_database
@@ -27,7 +28,14 @@ SEEDED_LEAGUES = list(US_PRO_LEAGUES) + [
 ]
 
 
-def team_rows(payload, league):
+# A roster this much smaller than what is already active is treated as a bad
+# response rather than a mass departure. Three clubs go down from the Premier
+# League each May, which is 15% of twenty, so the guard has to sit below that
+# while still catching a truncated or half-empty payload.
+SHRINK_GUARD = 0.7
+
+
+def team_rows(payload, league, seen_at):
     """ESPN nests these four deep: sports[0].leagues[0].teams[].team."""
     sports = payload.get("sports") or []
     leagues = (sports[0].get("leagues") if sports else []) or []
@@ -47,6 +55,7 @@ def team_rows(payload, league):
             team.get("location"),
             team.get("abbreviation"),
             logos[0].get("href") if logos else None,
+            seen_at,
         )
 
 
@@ -113,40 +122,78 @@ def local_crest(league: str, team_id: str) -> str:
     return "crests/%s/%s.png" % (league.replace("/", "_"), team_id)
 
 
-def seed(connection, fetcher=None, leagues=SEEDED_LEAGUES) -> dict:
+def seed(connection, fetcher=None, leagues=SEEDED_LEAGUES, now=None) -> dict:
+    """Refresh every seeded league and retire clubs that have left one.
+
+    Safe to run repeatedly; it is meant to, on a weekly timer. Teams that
+    reappear are reactivated, so promotion the season after relegation needs no
+    intervention.
+    """
     fetcher = fetcher or Fetcher()
-    counts = {}
+    seen_at = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    report = {}
+
     for league in leagues:
+        before = connection.execute(
+            "SELECT COUNT(*) FROM teams WHERE league = ? AND active = 1", (league,)
+        ).fetchone()[0]
+
         payload = fetcher.get_json("%s/%s/teams" % (SITE_API, league))
-        rows = list(team_rows(payload, league))
+        rows = list(team_rows(payload, league, seen_at))
+
         connection.executemany(
             "INSERT INTO teams"
             " (league, team_id, display_name, short_name, nickname, location,"
-            "  abbreviation, logo_url)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            "  abbreviation, logo_url, last_seen_at, active)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)"
             " ON CONFLICT(league, team_id) DO UPDATE SET"
             "  display_name = excluded.display_name,"
             "  short_name = excluded.short_name,"
             "  nickname = excluded.nickname,"
             "  location = excluded.location,"
             "  abbreviation = excluded.abbreviation,"
-            "  logo_url = excluded.logo_url",
+            "  logo_url = excluded.logo_url,"
+            "  last_seen_at = excluded.last_seen_at,"
+            "  active = 1",
             rows,
         )
-        counts[league] = len(rows)
-    return counts
+
+        # Never retire anything on the strength of a suspiciously thin
+        # response. A 200 carrying half a roster is a failure mode of this API,
+        # and the cost of acting on one is deactivating clubs people follow.
+        retired = 0
+        if not rows or (before and len(rows) < before * SHRINK_GUARD):
+            guarded = True
+        else:
+            guarded = False
+            cursor = connection.execute(
+                "UPDATE teams SET active = 0"
+                " WHERE league = ? AND active = 1"
+                "   AND (last_seen_at IS NULL OR last_seen_at < ?)",
+                (league, seen_at),
+            )
+            retired = cursor.rowcount or 0
+
+        report[league] = {"seen": len(rows), "retired": retired, "guarded": guarded}
+
+    return report
 
 
 def main(argv=None) -> int:
     config = settings()
     path = config.get("DATABASE_PATH") or os.environ.get("DATABASE_PATH", "sportscrawl.db")
     connection = open_database(path)
-    counts = seed(connection)
+    report = seed(connection)
     saved = download_crests(connection)
     print("crests downloaded: %d" % saved)
-    for league, count in counts.items():
-        print("%-22s %3d teams" % (league, count))
-    print("total %d, database %s" % (sum(counts.values()), path))
+    for league, info in report.items():
+        note = ""
+        if info["guarded"]:
+            note = "  SHORT RESPONSE, nothing retired"
+        elif info["retired"]:
+            note = "  retired %d" % info["retired"]
+        print("%-22s %3d teams%s" % (league, info["seen"], note))
+    print("total %d, database %s" % (sum(i["seen"] for i in report.values()), path))
     return 0
 
 

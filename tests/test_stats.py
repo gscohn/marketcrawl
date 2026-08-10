@@ -166,3 +166,49 @@ def test_the_windows_can_differ(db):
     result = {r["days"]: r for r in stats.retention(db, now=NOW)}
     assert result[7]["retained"] == 1            # still there at day 7
     assert result[30]["retained"] == 0           # gone by day 30
+
+
+# --------------------------------------------------------------------------
+# Orphaned subscriptions
+# --------------------------------------------------------------------------
+
+
+def test_a_sub_to_a_departed_club_is_reported(db):
+    """The only thing that surfaces it: the silence is byte-identical to the
+    intentional empty-digest rule."""
+    signup(db, "did:plc:a", NOW)
+    db.execute(
+        "INSERT INTO teams (league, team_id, short_name, active)"
+        " VALUES ('soccer/eng.1', '7', 'Relegated FC', 0)"
+    )
+    repo.add_sub(db, "did:plc:a", "team", "soccer/eng.1", "7")
+
+    orphans = stats.orphaned_subs(db)
+    assert len(orphans) == 1
+    assert orphans[0]["name"] == "Relegated FC"
+    assert orphans[0]["subscribers"] == 1
+    assert orphans[0]["reason"] == "left the league"
+
+
+def test_a_sub_to_an_active_club_is_not_reported(db):
+    signup(db, "did:plc:b", NOW)
+    db.execute(
+        "INSERT INTO teams (league, team_id, short_name, active)"
+        " VALUES ('baseball/mlb', '19', 'Dodgers', 1)"
+    )
+    repo.add_sub(db, "did:plc:b", "team", "baseball/mlb", "19")
+    assert stats.orphaned_subs(db) == []
+
+
+def test_a_sub_with_no_team_row_at_all_is_reported(db):
+    signup(db, "did:plc:c", NOW)
+    repo.add_sub(db, "did:plc:c", "team", "soccer/eng.1", "ghost")
+    orphans = stats.orphaned_subs(db)
+    assert orphans[0]["reason"] == "not in table"
+
+
+def test_competition_subs_are_never_orphans(db):
+    """Tournament slugs are deliberately unseeded and subscribed whole."""
+    signup(db, "did:plc:d", NOW)
+    repo.add_sub(db, "did:plc:d", "competition", "soccer/fifa.world")
+    assert stats.orphaned_subs(db) == []

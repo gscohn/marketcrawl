@@ -86,6 +86,20 @@ def build(db, now=None) -> str:
     else:
         lines.append("Data sources: all healthy")
 
+    # A subscription pointing at a club that has left its league produces
+    # silence forever, and that silence is byte-identical to the intentional
+    # empty-digest rule. Nothing else would ever surface it.
+    orphans = stats.orphaned_subs(db)
+    if orphans:
+        lines.append("")
+        lines.append("Subscriptions to teams no longer in their league:")
+        for row in orphans[:5]:
+            lines.append(
+                "  %s (%s): %d subscriber%s"
+                % (row["name"], row["league"], row["subscribers"],
+                   "" if row["subscribers"] == 1 else "s")
+            )
+
     age = backup_age_hours()
     if age is None:
         lines.append("Backup: NONE FOUND")

@@ -82,3 +82,22 @@ def test_the_report_names_no_subscriber(db, monkeypatch):
     repo.create_subscriber(db, "did:plc:identifiable", NOW, PEPPER, tz="UTC")
     text = daily_report.build(db)
     assert "did:plc:" not in text
+
+
+def test_orphaned_subs_are_named_in_the_daily_report(db, monkeypatch):
+    monkeypatch.setattr(daily_report, "backup_age_hours", lambda *a, **k: 1.0)
+    repo.create_subscriber(db, "did:plc:a", NOW, PEPPER, tz="UTC")
+    db.execute(
+        "INSERT INTO teams (league, team_id, short_name, active)"
+        " VALUES ('soccer/eng.1', '7', 'Relegated FC', 0)"
+    )
+    repo.add_sub(db, "did:plc:a", "team", "soccer/eng.1", "7")
+
+    text = daily_report.build(db)
+    assert "no longer in their league" in text
+    assert "Relegated FC" in text
+
+
+def test_a_clean_database_says_nothing_about_orphans(db, monkeypatch):
+    monkeypatch.setattr(daily_report, "backup_age_hours", lambda *a, **k: 1.0)
+    assert "no longer in their league" not in daily_report.build(db)

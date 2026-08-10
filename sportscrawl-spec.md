@@ -163,8 +163,28 @@ Two subscription kinds with different assembly logic:
 
 ### teams
 
-Seeded from ESPN at setup, refreshed occasionally. Used for command matching
-and the config page picker.
+Seeded from ESPN and **refreshed weekly** by `sportscrawl-reseed.timer`, plus
+on every deploy. Used for command matching and the config page picker.
+
+"Refreshed occasionally" was the original wording and nothing implemented it:
+seeding ran only when the table was empty, so the roster froze at first deploy.
+A relegated club kept its row and stayed selectable, a promoted club never
+appeared, and a rename persisted. Worse, a subscriber following a departed club
+got `kind="silent"` forever, which is byte for byte the intentional empty
+digest of section 6 and therefore invisible.
+
+Departure is handled by **deactivating, never deleting**. `active = 0` keeps
+the row so an existing subscription still resolves to a readable name, while
+the picker offers only active clubs. A `DELETE` would be unsafe in the other
+direction: a 200 carrying a truncated roster would erase real teams, so a seed
+run that sees a league shrink by more than 30% retires nobody and says so.
+Three relegations out of twenty is 15%, comfortably inside that.
+
+Subscriptions pointing at a departed club are reported in the daily operations
+summary. The obvious alternative, warning on subscriptions that produced no
+line for N days, cannot work: an NFL-only subscriber legitimately matches
+nothing from February to September. Absence of games says nothing; absence from
+the roster says everything.
 
 | column | notes |
 |---|---|

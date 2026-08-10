@@ -249,8 +249,11 @@ def create_app(database_path=None, config=None):
         chosen_teams = {(s.league, s.team_id) for s in chosen if s.kind == "team"}
         chosen_comps = {s.league for s in chosen if s.kind == "competition"}
 
+        # Active only. A club that has left its league stays in the table so
+        # existing subscriptions still resolve to a readable name, but offering
+        # it to somebody new would be selling a guaranteed silence.
         rows = db().execute(
-            "SELECT * FROM teams ORDER BY league, display_name"
+            "SELECT * FROM teams WHERE active = 1 ORDER BY league, display_name"
         ).fetchall()
         grouped = {}
         for row in rows:

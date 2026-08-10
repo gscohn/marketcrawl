@@ -66,20 +66,14 @@ print("applied: %s" % (applied or "nothing pending"))
 PYTHON
 
 say "Team data"
-# Printing the count rather than signalling through an exit code: under
-# `set -e` a non-zero exit ends the script before the branch can read it.
-TEAMS=$(as_app "$PY" -c '
-from sportscrawl.config import settings
-from sportscrawl.db import open_database
-print(open_database(settings()["DATABASE_PATH"]).execute(
-    "SELECT COUNT(*) FROM teams").fetchone()[0])
-')
-if [ "$TEAMS" -eq 0 ]; then
-    echo "no teams, seeding rosters and crests"
-    as_app "$PY" seed_teams.py
-else
-    echo "teams already seeded: $TEAMS"
-fi
+# Always reseed, not just when the table is empty.
+#
+# The old condition meant seed_teams.py ran exactly once, at first deploy, and
+# never again: no timer, no cron, nothing. A club that left its league kept its
+# row and stayed selectable, a promoted club never appeared, and a rename
+# persisted forever. sportscrawl-reseed.timer repeats this weekly; running it
+# here as well keeps a deploy and the timer from disagreeing.
+as_app "$PY" seed_teams.py
 
 say "Restarting"
 # Gunicorn first so the config page is back quickly, then the two workers.

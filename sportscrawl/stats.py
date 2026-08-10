@@ -211,6 +211,31 @@ def config_visits(db) -> dict:
     return {"loads": loads, "saves": saves, "returning": returners}
 
 
+def orphaned_subs(db) -> list:
+    """Team subscriptions whose club is no longer in that league.
+
+    The roster is the authority on whether a team still exists in a league, so
+    this is deterministic. The obvious alternative, warning on subscriptions
+    that produced no line for N days, cannot work: an NFL-only subscriber
+    legitimately matches nothing from February to September, and a team on a
+    bye matches nothing for a week. Absence of games says nothing; absence
+    from the roster says everything.
+    """
+    rows = db.execute(
+        "SELECT s.league, s.team_id,"
+        "       COALESCE(t.short_name, t.display_name, s.team_id) AS name,"
+        "       COUNT(DISTINCT s.did) AS subscribers,"
+        "       CASE WHEN t.league IS NULL THEN 'not in table'"
+        "            ELSE 'left the league' END AS reason"
+        " FROM subs s"
+        " LEFT JOIN teams t ON t.league = s.league AND t.team_id = s.team_id"
+        " WHERE s.kind = 'team' AND (t.league IS NULL OR t.active = 0)"
+        " GROUP BY s.league, s.team_id"
+        " ORDER BY subscribers DESC, name"
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def league_health(db) -> list:
     return [
         dict(row)
@@ -232,5 +257,6 @@ def summary(db, floor=MIN_BUCKET) -> dict:
         "stops": stop_stats(db),
         "config": config_visits(db),
         "health": league_health(db),
+        "orphans": orphaned_subs(db),
         "floor": floor,
     }
