@@ -50,6 +50,14 @@ ended.
 - [ ] Test both directions: a finished tournament closes, a not-yet-started one
       survives indefinitely.
 
+## Done 2026-08-10
+
+- [x] Team roster refresh. The table was frozen at first seed, so a departed
+      club stayed selectable and its subscribers got silence indistinguishable
+      from the empty-digest rule. Weekly timer, deactivate rather than delete,
+      and orphaned subscriptions named in the daily report. See the
+      teams-table-never-refreshes memory for the constraints.
+
 ## Smaller
 
 - [ ] Collapsed league summaries could show selected teams as chips instead of
