@@ -39,13 +39,24 @@ if grep -q $'\r' "$ENV_FILE"; then
     fail "$ENV_FILE has CRLF line endings; every value carries a trailing CR"
 fi
 
-say "Pulling"
-BEFORE_REQS=$(sudo -u "$SERVICE_USER" git -C "$APP_DIR" rev-parse HEAD:requirements.txt 2>/dev/null || echo none)
-sudo -u "$SERVICE_USER" git -C "$APP_DIR" pull --ff-only
-AFTER_REQS=$(sudo -u "$SERVICE_USER" git -C "$APP_DIR" rev-parse HEAD:requirements.txt 2>/dev/null || echo none)
-sudo -u "$SERVICE_USER" git -C "$APP_DIR" log --oneline -1
+# Pull, then hand over to the version we just pulled.
+#
+# bash reads a script incrementally by byte offset, so `git pull` rewriting
+# this file mid-run leaves execution pointing into different content. Observed
+# 2026-08-10: the pull landed a rewritten seeding step and the deploy then ran
+# the previous one, reporting "teams already seeded" from a version that no
+# longer existed on disk. Benign that time. It would not always be.
+if [ "${DEPLOY_REEXEC:-}" != "1" ]; then
+    say "Pulling"
+    BEFORE_REQS=$(sudo -u "$SERVICE_USER" git -C "$APP_DIR" rev-parse HEAD:requirements.txt 2>/dev/null || echo none)
+    sudo -u "$SERVICE_USER" git -C "$APP_DIR" pull --ff-only
+    AFTER_REQS=$(sudo -u "$SERVICE_USER" git -C "$APP_DIR" rev-parse HEAD:requirements.txt 2>/dev/null || echo none)
+    sudo -u "$SERVICE_USER" git -C "$APP_DIR" log --oneline -1
+    export DEPLOY_REEXEC=1 BEFORE_REQS AFTER_REQS
+    exec "$APP_DIR/deploy.sh" "$@"
+fi
 
-if [ "$BEFORE_REQS" != "$AFTER_REQS" ]; then
+if [ "${BEFORE_REQS:-none}" != "${AFTER_REQS:-none}" ]; then
     say "Dependencies changed, installing"
     as_app "$VENV/bin/pip" -q install -r "$APP_DIR/requirements.txt"
 else
