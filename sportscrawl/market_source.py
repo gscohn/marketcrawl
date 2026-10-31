@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from .http import FetchError, Fetcher
+from .market_schedule import filing_window
 from .nyse_calendar import new_york_date
 from .source import LeagueHealth, WindowResult
 from .yahoo import ParseError, chart_url, parse_chart, quote_for, symbol_of
@@ -38,11 +39,11 @@ class _CacheEntry:
 
 
 class YahooSource:
-    def __init__(self, fetcher=None, ttl=CHART_TTL, range_="5d"):
+    def __init__(self, fetcher=None, ttl=CHART_TTL, range_="1mo"):
         self._fetcher = fetcher or Fetcher(user_agent=USER_AGENT)
         self._ttl = ttl
-        # How much history to ask for. Five days covers a normal morning;
-        # replay asks for a month so it can walk backwards in time.
+        # How much history to ask for. A month covers yesterday's close and
+        # "normal" volume; replay asks for more so it can walk back in time.
         self._range = range_
         self._charts = {}
         self.health = {}
@@ -105,3 +106,37 @@ class YahooSource:
             raise
         except ParseError:
             return None
+
+
+class MarketSource:
+    """Prices from Yahoo, plus (optionally) filings from the SEC.
+
+    ELI5: the scheduler only knows how to talk to one source. This one
+    asks Yahoo for prices and EDGAR for filings, and hands both back in the
+    same pile, the way a waiter brings food from two kitchens on one tray.
+    The formatter sorts the pile out again.
+
+    Only prices count toward "this symbol failed". A missing filing list
+    never delays or spoils anyone's message.
+    """
+
+    def __init__(self, prices, filings=None):
+        self._prices = prices
+        self._filings = filings
+
+    @property
+    def health(self):
+        return self._prices.health
+
+    def lookup(self, symbol: str, now: datetime):
+        return self._prices.lookup(symbol, now)
+
+    def fetch_window(self, leagues, now: datetime) -> WindowResult:
+        leagues = list(leagues)
+        result = self._prices.fetch_window(leagues, now)
+        window = filing_window(new_york_date(now)) if self._filings else None
+        if window is not None:
+            start, end = window
+            symbols = [symbol_of(league) for league in leagues]
+            result.events.extend(self._filings.filings(symbols, start, end, now))
+        return result

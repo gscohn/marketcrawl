@@ -7,6 +7,7 @@ ELI5: there's no website to pick your stocks. You just message the bot:
     remove AAPL         -> stop following Apple
     list                -> what am I following?
     help                -> the list of commands
+    about               -> where this bot comes from
     stop / start        -> pause / resume messages
     delete              -> forget everything about me
 
@@ -56,8 +57,9 @@ ADD_WORDS = frozenset({"add", "follow", "track"})
 REMOVE_WORDS = frozenset({"remove", "rm", "drop", "unfollow", "untrack"})
 LIST_WORDS = frozenset({"list", "ls", "mine"})
 HELP_WORDS = frozenset({"help", "commands", "?"})
+ABOUT_WORDS = frozenset({"about", "credits", "source"})
 
-HELP = """MarketCrawl sends one message after the US stock market closes, with the closing prices of the symbols you follow.
+HELP = """MarketCrawl sends one message after the US stock market closes, with the closing prices of the symbols you follow, plus any earnings releases and quarterly or annual reports they filed.
 
 add AAPL - follow a symbol (or several: add AAPL MSFT)
 remove AAPL - stop following one
@@ -65,9 +67,24 @@ list - what you follow
 stop - pause messages
 start - resume messages
 delete - remove all your data
+about - where this bot comes from
 help - this list
 
-Indexes: sp500, dow, nasdaq"""
+Indexes: sp500, dow, nasdaq
+
+\N{CHART WITH UPWARDS TREND} up  \N{CHART WITH DOWNWARDS TREND} down  \N{ROCKET}/\N{COLLISION SYMBOL} big day (5%+, or 2%+ for an index)  \N{SPEAKER WITH THREE SOUND WAVES} twice the usual trading volume
+
+A spin-off of SportsCrawl (@sportscrawl.app) by cruftbox."""
+
+# The credit, in full. MarketCrawl is built on SportsCrawl's code, and
+# saying so plainly is both the MIT license's one requirement and good
+# manners.
+ABOUT = """MarketCrawl is a spin-off of SportsCrawl (@sportscrawl.app), the daily sports scores bot by cruftbox. It runs on SportsCrawl's own code, reworked for stocks: the scheduling, the DM handling and the care about never messaging you twice all come from there.
+
+If you like scores as much as stocks, follow @sportscrawl.app.
+
+Prices: Yahoo Finance. Filings: SEC EDGAR.
+Source: https://github.com/gscohn/marketcrawl"""
 
 # A repeat unknown message inside the hour gets this instead of the full
 # help. The original project's reason, kept: a full reply to every message
@@ -140,6 +157,8 @@ class MarketCommandHandler(CommandHandler):
                 return self._list(did)
             if kind == "privacy":
                 return PRIVACY
+            if kind == "about":
+                return ABOUT
             # help, plus the original's web-page commands (config, admin),
             # which mean nothing here.
             repo.set_help_sent(self._db, message.convo_id, now)
@@ -256,7 +275,8 @@ def _kind(verb: str) -> str:
     if verb in ("config", "privacy", "admin"):
         return verb
     for name, words in (("add", ADD_WORDS), ("remove", REMOVE_WORDS),
-                        ("list", LIST_WORDS), ("help", HELP_WORDS)):
+                        ("list", LIST_WORDS), ("help", HELP_WORDS),
+                        ("about", ABOUT_WORDS)):
         if verb in words:
             return name
     return "unknown"

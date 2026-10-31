@@ -224,3 +224,11 @@ def test_the_log_names_the_command_never_the_text(bot):
     assert "matched=add" in logged
     assert "AAPL" not in logged
     assert "secret" not in logged
+
+
+def test_about_credits_sportscrawl(bot):
+    from sportscrawl.market_commands import ABOUT
+
+    assert bot("about") == ABOUT
+    assert "SportsCrawl" in ABOUT and "cruftbox" in ABOUT
+    assert "SportsCrawl" in HELP

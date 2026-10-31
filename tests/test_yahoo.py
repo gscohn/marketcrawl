@@ -95,3 +95,14 @@ def test_junk_is_a_parse_error(junk):
 
 def test_symbol_and_league_round_trip():
     assert symbol_of(league_for("^gspc")) == "^GSPC"
+
+
+def test_volume_compared_with_the_last_month():
+    quote = quote_for(parse_chart(payload("aapl_1mo.json"), "AAPL"), FRIDAY)
+    assert quote.volume == 67797500
+    assert round(quote.volume_ratio, 2) == 1.75
+
+
+def test_too_little_history_means_no_volume_verdict():
+    quote = quote_for(parse_chart(payload("aapl_5d.json"), "AAPL"), FRIDAY)
+    assert quote.volume_ratio is None

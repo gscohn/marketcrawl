@@ -29,10 +29,11 @@ class ParseError(Exception):
 
 @dataclass(frozen=True)
 class Bar:
-    """One day of trading, boiled down to the only number we use."""
+    """One day of trading, boiled down to the two numbers we use."""
 
     day: date  # the New York trading date
     close: float
+    volume: int | None = None  # how many shares changed hands; None if Yahoo left it out
 
 
 @dataclass(frozen=True)
@@ -71,6 +72,10 @@ class Quote:
     close: float
     prev_close: float
     close_date: date
+    # Today's volume, and the average over the days before it. None when
+    # Yahoo didn't give us enough to say (some indexes have no volume).
+    volume: int | None = None
+    avg_volume: float | None = None
 
     @property
     def league(self) -> str:
@@ -85,6 +90,13 @@ class Quote:
         """Percent change. 100 -> 101 is +1.0."""
         return self.change / self.prev_close * 100 if self.prev_close else 0.0
 
+    @property
+    def volume_ratio(self) -> float | None:
+        """Today's volume as a multiple of normal. 2.0 means twice as busy."""
+        if not self.volume or not self.avg_volume:
+            return None
+        return self.volume / self.avg_volume
+
 
 def league_for(symbol: str) -> str:
     return "market/%s" % symbol.upper()
@@ -95,9 +107,17 @@ def symbol_of(league: str) -> str:
     return league.split("/", 1)[1]
 
 
-def chart_url(symbol: str, range_: str = "5d") -> str:
-    """5 days is enough to always include yesterday's close, even after a
-    long weekend. Replay asks for more."""
+# How many earlier days make up "normal" volume. About a month of trading.
+VOLUME_LOOKBACK = 20
+# Fewer earlier days than this and an average means little, so we don't
+# report on volume at all.
+MIN_VOLUME_HISTORY = 10
+
+
+def chart_url(symbol: str, range_: str = "1mo") -> str:
+    """A month: enough to always include yesterday's close, even after a long
+    weekend, and enough earlier days to know what "normal volume" looks like.
+    Replay asks for more."""
     return "%s/%s?range=%s&interval=1d" % (CHART_API, symbol, range_)
 
 
@@ -116,15 +136,18 @@ def parse_chart(payload: dict, symbol: str) -> History:
         zone = ZoneInfo(meta["exchangeTimezoneName"])
 
         stamps = result.get("timestamp") or []
-        closes = result["indicators"]["quote"][0].get("close") or []
+        prices = result["indicators"]["quote"][0]
+        closes = prices.get("close") or []
+        volumes = prices.get("volume") or [None] * len(closes)
 
         bars = []
-        for stamp, close in zip(stamps, closes):
+        for stamp, close, volume in zip(stamps, closes, volumes):
             # Yahoo sometimes leaves a hole (null) for a day with no trades.
             # Skip it rather than pretend it was zero.
             if close is None:
                 continue
-            bars.append(Bar(day=_utc(stamp).astimezone(zone).date(), close=float(close)))
+            bars.append(Bar(day=_utc(stamp).astimezone(zone).date(), close=float(close),
+                            volume=int(volume) if volume else None))
 
         regular = (meta.get("currentTradingPeriod") or {}).get("regular") or {}
         session_end = _utc(regular["end"]) if "end" in regular else None
@@ -174,7 +197,17 @@ def quote_for(history: History, day: date) -> Quote | None:
         close=bar.close,
         prev_close=history.bars[index - 1].close,
         close_date=day,
+        volume=bar.volume,
+        avg_volume=_average_volume(history.bars[max(0, index - VOLUME_LOOKBACK):index]),
     )
+
+
+def _average_volume(bars) -> float | None:
+    """The average volume of these days, or None if there's too little to go on."""
+    volumes = [bar.volume for bar in bars if bar.volume]
+    if len(volumes) < MIN_VOLUME_HISTORY:
+        return None
+    return sum(volumes) / len(volumes)
 
 
 def load_fixture(path: str | Path, symbol: str) -> History:

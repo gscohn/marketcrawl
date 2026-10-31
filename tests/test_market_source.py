@@ -108,3 +108,31 @@ def test_lookup_raises_when_yahoo_is_down():
     down = FakeTransport({chart_url("AAPL"): Response(503, "")})
     with pytest.raises(FetchError):
         source_for(down).lookup("AAPL", AFTER_CLOSE)
+
+
+# -- prices and filings together -------------------------------------------
+
+from sportscrawl.edgar import Filing  # noqa: E402
+from sportscrawl.market_source import MarketSource  # noqa: E402
+
+
+class FakeFilings:
+    def __init__(self):
+        self.asked = None
+
+    def filings(self, symbols, start, end, now):
+        self.asked = (list(symbols), start, end)
+        return [Filing(symbol="AAPL", form="10-K", accepted=end, url="https://x")]
+
+
+def test_filings_ride_along_with_prices(transport):
+    filings = FakeFilings()
+    result = MarketSource(source_for(transport), filings).fetch_window([AAPL, GSPC], AFTER_CLOSE)
+    assert {type(e).__name__ for e in result.events} == {"Quote", "Filing"}
+    assert filings.asked[0] == ["AAPL", "^GSPC"]
+    assert filings.asked[2] == AFTER_CLOSE  # today's window ends at 4:15pm
+
+
+def test_without_filings_it_is_just_prices(transport):
+    result = MarketSource(source_for(transport)).fetch_window([AAPL], AFTER_CLOSE)
+    assert [type(e).__name__ for e in result.events] == ["Quote"]

@@ -8,6 +8,14 @@ this terminal", so you can watch it work without a Bluesky account.
     python run_market.py --once      check once, then exit
     python run_market.py             check every minute until stopped
 
+    python run_market.py --once --send --only did:plc:abc
+                                     send real Bluesky DMs, to one person only
+    python run_market.py --once --at 2026-10-30T20:20:00Z
+                                     pretend it's that moment (for testing)
+
+Filings from the SEC are included when SEC_CONTACT is set (the SEC requires
+an email address in every request; see edgar_source.py).
+
 It's the original run_scheduler.py with the market pieces plugged in: the
 Yahoo source instead of ESPN, the market clock instead of each person's
 chosen send time, and the market formatter instead of the sports one.
@@ -21,23 +29,37 @@ import sys
 import time
 from datetime import datetime, timezone
 
-from sportscrawl.config import settings
+from sportscrawl.chat import ChatClient
+from sportscrawl.config import load_env_file, require, settings
 from sportscrawl.db import open_database
+from sportscrawl.edgar_source import EdgarSource
 from sportscrawl.logs import configure
 from sportscrawl.market_formatter import format_market_digest
 from sportscrawl.market_repo import ticker_leagues
 from sportscrawl.market_schedule import classify_market
-from sportscrawl.market_source import YahooSource
+from sportscrawl.market_source import MarketSource, YahooSource
 from sportscrawl.scheduler import Scheduler, stdout_sender
+from sportscrawl.senders import AllowlistSender, ChatSender
 
 TICK_SECONDS = 60
 DEFAULT_DATABASE = "marketcrawl.db"
 
 
+def sec_contact() -> str | None:
+    """Read outside settings(): the original's settings only pass through
+    the keys it knows, and this one is ours."""
+    return os.environ.get("SEC_CONTACT") or load_env_file().get("SEC_CONTACT")
+
+
+def default_source() -> MarketSource:
+    contact = sec_contact()
+    return MarketSource(YahooSource(), EdgarSource(contact) if contact else None)
+
+
 def build(database_path: str, pepper: str, sender=None, source=None) -> Scheduler:
     return Scheduler(
         connection=open_database(database_path),
-        source=source or YahooSource(),
+        source=source or default_source(),
         # A function, not a list: which symbols to fetch depends on what
         # people follow right now, so it's looked up fresh every tick.
         leagues=ticker_leagues,
@@ -53,10 +75,19 @@ def main(argv=None) -> int:
     parser.add_argument("--once", action="store_true", help="one tick, then exit")
     parser.add_argument("--database",
                         default=os.environ.get("DATABASE_PATH", DEFAULT_DATABASE))
+    parser.add_argument("--send", action="store_true",
+                        help="send real Bluesky DMs instead of printing")
+    parser.add_argument("--only", action="append", metavar="DID",
+                        help="with --send: refuse to message anyone else (repeatable)")
+    parser.add_argument("--at", metavar="ISO_TIME",
+                        help="with --once: pretend it's this moment, e.g. 2026-10-30T20:20:00Z")
     args = parser.parse_args(argv)
+    if args.at and not args.once:
+        parser.error("--at only makes sense with --once")
 
     configure()
-    pepper = settings().get("EVENTS_PEPPER") or os.environ.get("EVENTS_PEPPER")
+    config = settings()
+    pepper = config.get("EVENTS_PEPPER") or os.environ.get("EVENTS_PEPPER")
     if not pepper:
         # Same refusal as the original: the pepper scrambles IDs in the
         # stats table, and a silent default would quietly scramble them
@@ -64,9 +95,22 @@ def main(argv=None) -> int:
         print("EVENTS_PEPPER is not set (put it in .env)", file=sys.stderr)
         return 2
 
-    scheduler = build(args.database, pepper)
+    sender = None
+    if args.send:
+        require(config, "BSKY_IDENTIFIER", "BSKY_APP_PASSWORD")
+        client = ChatClient(config["BSKY_IDENTIFIER"], config["BSKY_APP_PASSWORD"])
+        client.login()
+        sender = ChatSender(client)
+        if args.only:
+            # The original's safety catch for testing: a half-finished bot
+            # can only message the people named here.
+            sender = AllowlistSender(sender, args.only)
+
+    scheduler = build(args.database, pepper, sender=sender)
     while True:
-        report = scheduler.tick(datetime.now(timezone.utc))
+        now = (datetime.fromisoformat(args.at.replace("Z", "+00:00")) if args.at
+               else datetime.now(timezone.utc))
+        report = scheduler.tick(now)
         print("[%s] %s" % (datetime.now(timezone.utc).strftime("%H:%M:%S"), report),
               flush=True)
         if args.once:

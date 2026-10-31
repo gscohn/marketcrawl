@@ -19,7 +19,7 @@ Pure: no network, no database, no clock. Pass in a date, get an answer.
 
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 # Every time in this file is New York time. zoneinfo handles the switch
@@ -99,6 +99,15 @@ def session(day: date):
     opens = datetime.combine(day, OPEN, tzinfo=NEW_YORK)
     closes = datetime.combine(day, closing, tzinfo=NEW_YORK)
     return opens.astimezone(ZoneInfo("UTC")), closes.astimezone(ZoneInfo("UTC"))
+
+
+def previous_session_day(day: date) -> date:
+    """The last trading day before `day`. Monday's is the Friday before
+    (or Thursday, if that Friday was a holiday)."""
+    day -= timedelta(days=1)
+    while session(day) is None:
+        day -= timedelta(days=1)
+    return day
 
 
 def new_york_date(when: datetime) -> date:

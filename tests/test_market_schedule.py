@@ -50,3 +50,20 @@ def test_expired_when_far_too_late():
 def test_once_per_session():
     verdict, _ = classify_market(row("2026-10-30"), utc(2026, 10, 30, 20, 30))
     assert verdict == NOT_DUE
+
+
+def test_filing_window_runs_from_the_last_message_to_this_one():
+    from datetime import date
+
+    from sportscrawl.market_schedule import filing_window
+    from sportscrawl.nyse_calendar import NEW_YORK
+
+    # Monday Nov 2: everything since Friday's message, weekend included.
+    start, end = filing_window(date(2026, 11, 2))
+    assert start.astimezone(NEW_YORK) == datetime(2026, 10, 30, 16, 15, tzinfo=NEW_YORK)
+    assert end.astimezone(NEW_YORK) == datetime(2026, 11, 2, 16, 15, tzinfo=NEW_YORK)
+    # The Monday after Thanksgiving week starts from Friday's early close.
+    start, _ = filing_window(date(2026, 11, 30))
+    assert start.astimezone(NEW_YORK) == datetime(2026, 11, 27, 13, 15, tzinfo=NEW_YORK)
+    # No trading, no window.
+    assert filing_window(date(2026, 11, 26)) is None
