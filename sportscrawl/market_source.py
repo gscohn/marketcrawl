@@ -20,8 +20,9 @@ from .http import FetchError, Fetcher
 from .market_schedule import filing_window
 from .nyse_calendar import new_york_date
 from .source import LeagueHealth, WindowResult
-from .yahoo import (ParseError, chart_url, extremes, full_history_url, latest_quote,
-                    mark_milestones, parse_chart, quote_for, symbol_of)
+from .yahoo import (GAINERS, LOSERS, ParseError, chart_url, extremes, full_history_url,
+                    latest_quote, mark_milestones, parse_chart, parse_screener, quote_for,
+                    screener_url, symbol_of)
 
 # How long a download stays fresh. Short, because after the close the
 # scheduler retries every minute while a symbol is late, and each retry
@@ -64,6 +65,23 @@ class YahooSource:
         history = parse_chart(payload, symbol)
         self._charts[symbol] = _CacheEntry(fetched_at=now, history=history)
         return history
+
+    def movers(self, now: datetime) -> list:
+        """The day's biggest gainers and losers, for the public post.
+        Cached like a chart. Never raises: no movers is a shorter post, not
+        a missing one."""
+        found = []
+        for list_id in (GAINERS, LOSERS):
+            cached = self._charts.get(list_id)
+            if cached is None or now - cached.fetched_at >= self._ttl:
+                try:
+                    movers = parse_screener(self._fetcher.get_json(screener_url(list_id)))
+                except (FetchError, ParseError):
+                    movers = []
+                cached = _CacheEntry(fetched_at=now, history=movers)
+                self._charts[list_id] = cached
+            found.extend(cached.history)
+        return found
 
     def milestones(self, quote, now: datetime):
         """Mark a quote as a record high or 52-week low if it is one.
@@ -160,9 +178,11 @@ class MarketSource:
     never delays or spoils anyone's message.
     """
 
-    def __init__(self, prices, filings=None):
+    def __init__(self, prices, filings=None, movers=False):
         self._prices = prices
         self._filings = filings
+        # Fetch the market's biggest movers too (for the public post).
+        self._movers = movers
 
     @property
     def health(self):
@@ -173,6 +193,23 @@ class MarketSource:
 
     def latest(self, symbols, now: datetime) -> list:
         return self._prices.latest(symbols, now)
+
+    def movers(self, now: datetime) -> list:
+        """The day's biggest gainers and losers, for the public post.
+        Cached like a chart. Never raises: no movers is a shorter post, not
+        a missing one."""
+        found = []
+        for list_id in (GAINERS, LOSERS):
+            cached = self._charts.get(list_id)
+            if cached is None or now - cached.fetched_at >= self._ttl:
+                try:
+                    movers = parse_screener(self._fetcher.get_json(screener_url(list_id)))
+                except (FetchError, ParseError):
+                    movers = []
+                cached = _CacheEntry(fetched_at=now, history=movers)
+                self._charts[list_id] = cached
+            found.extend(cached.history)
+        return found
 
     def milestones(self, quote, now: datetime):
         """Mark a quote as a record high or 52-week low if it is one.
@@ -203,4 +240,6 @@ class MarketSource:
             start, end = window
             symbols = [symbol_of(league) for league in leagues]
             result.events.extend(self._filings.filings(symbols, start, end, now))
+        if self._movers:
+            result.events.extend(self._prices.movers(now))
         return result

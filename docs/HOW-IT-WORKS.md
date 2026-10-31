@@ -93,6 +93,17 @@ of it:
 - **Nothing to say means saying nothing.** Weekends and holidays send no
   message at all, not a "markets closed" note.
 
+### The public post
+
+Once a day the bot also writes a public post: the S&P 500, Nasdaq and Dow,
+plus the market's three biggest risers and fallers (from Yahoo's "day
+gainers / losers" lists), and an invitation to DM it. It's built as one more
+subscriber, a pretend one called the feed (`market_feed.py`), so it gets the
+mail room's once-a-day and retry rules for free. Only the writing (300
+characters max, never an apology in public) and the delivery (a post, not a
+DM) are different. `feed.py enable` switches it on; for now posts are a dry
+run, printed instead of posted.
+
 ## The front desk
 
 The poller reads new DMs and hands each one to a command handler, which

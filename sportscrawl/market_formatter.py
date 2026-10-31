@@ -28,6 +28,7 @@ from .edgar import Filing
 from .formatter import MAX_MESSAGE, _header
 from .models import Digest
 from .nyse_calendar import new_york_date
+from .yahoo import Quote
 
 UP = "\N{CHART WITH UPWARDS TREND}"
 DOWN = "\N{CHART WITH DOWNWARDS TREND}"
@@ -116,7 +117,9 @@ def format_market_digest(events, subs, tz: str, now: datetime,
     newcomer's first report asks for the last finished one.
     """
     day = day or new_york_date(now)
-    quotes = [e for e in events if not isinstance(e, Filing)]
+    # (The pile can also hold the market's biggest movers, which are only
+    # for the public post; they're neither, so they're ignored here.)
+    quotes = [e for e in events if isinstance(e, Quote)]
     filings = [e for e in events if isinstance(e, Filing)]
 
     followed = {sub.league for sub in subs if sub.kind == "ticker"}

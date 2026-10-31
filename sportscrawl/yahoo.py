@@ -266,6 +266,48 @@ def _average_volume(bars) -> float | None:
     return sum(volumes) / len(volumes)
 
 
+# -- the market's biggest movers -------------------------------------------
+
+SCREENER_API = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
+GAINERS = "day_gainers"
+LOSERS = "day_losers"
+
+
+@dataclass(frozen=True)
+class Mover:
+    """One of the day's biggest risers or fallers across the US market."""
+
+    symbol: str
+    name: str
+    pct: float
+    day: date  # the trading day this move happened on
+
+
+def screener_url(list_id: str, count: int = 6) -> str:
+    """Yahoo's ready-made "biggest gainers / losers today" lists. They cover
+    US companies worth roughly $2 billion or more, so penny stocks that
+    double on nothing don't crowd out real news."""
+    return "%s?scrIds=%s&count=%d" % (SCREENER_API, list_id, count)
+
+
+def parse_screener(payload: dict) -> list:
+    """One of those lists -> Movers, biggest move first. Raises ParseError."""
+    try:
+        result = payload["finance"]["result"][0]
+        movers = []
+        for row in result["quotes"]:
+            zone = ZoneInfo(row.get("exchangeTimezoneName") or "America/New_York")
+            movers.append(Mover(
+                symbol=row["symbol"],
+                name=row.get("shortName") or row["symbol"],
+                pct=float(row["regularMarketChangePercent"]),
+                day=_utc(row["regularMarketTime"]).astimezone(zone).date(),
+            ))
+        return movers
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        raise ParseError("malformed screener: %s" % exc) from exc
+
+
 def load_fixture(path: str | Path, symbol: str) -> History:
     """Read a saved chart from disk, for tests."""
     with open(path, encoding="utf-8") as handle:

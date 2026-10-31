@@ -13,6 +13,9 @@ this terminal", so you can watch it work without a Bluesky account.
     python run_market.py --once --at 2026-10-30T20:20:00Z
                                      pretend it's that moment (for testing)
 
+The daily public post (see market_feed.py) is switched on with
+`python feed.py enable` and is a DRY RUN: printed, never posted.
+
 Filings from the SEC are included when SEC_CONTACT is set (the SEC requires
 an email address in every request; see edgar_source.py).
 
@@ -34,7 +37,7 @@ from sportscrawl.config import load_env_file, require, settings
 from sportscrawl.db import open_database
 from sportscrawl.edgar_source import EdgarSource
 from sportscrawl.logs import configure
-from sportscrawl.market_formatter import format_market_digest
+from sportscrawl.market_feed import FeedRouter, format_for
 from sportscrawl.market_repo import ticker_leagues
 from sportscrawl.market_schedule import classify_market
 from sportscrawl.market_source import MarketSource, YahooSource
@@ -53,7 +56,8 @@ def sec_contact() -> str | None:
 
 def default_source() -> MarketSource:
     contact = sec_contact()
-    return MarketSource(YahooSource(), EdgarSource(contact) if contact else None)
+    return MarketSource(YahooSource(), EdgarSource(contact) if contact else None,
+                        movers=True)
 
 
 def build(database_path: str, pepper: str, sender=None, source=None) -> Scheduler:
@@ -64,8 +68,10 @@ def build(database_path: str, pepper: str, sender=None, source=None) -> Schedule
         # people follow right now, so it's looked up fresh every tick.
         leagues=ticker_leagues,
         pepper=pepper,
-        sender=sender or stdout_sender,
-        formatter=format_market_digest,
+        # The public feed's post goes to the poster (a dry run for now:
+        # printed, not posted); everyone else's message goes to `sender`.
+        sender=FeedRouter(sender or stdout_sender),
+        formatter=format_for,
         classifier=classify_market,
     )
 

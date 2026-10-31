@@ -23,6 +23,10 @@ trading volume.
 DM it `add AAPL`, `remove AAPL`, `list`, `about` or `help`. It sends nothing
 on weekends and market holidays.
 
+It also writes one public post per trading day: the three big indexes and
+the market's biggest movers. (For now that's a dry run, printed rather than
+posted; `python feed.py preview` shows today's.)
+
 ## Built on SportsCrawl
 
 marketcrawl is a spin-off of [SportsCrawl](https://github.com/cruftbox/sportscrawl)
