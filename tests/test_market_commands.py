@@ -232,3 +232,72 @@ def test_about_credits_sportscrawl(bot):
     assert bot("about") == ABOUT
     assert "SportsCrawl" in ABOUT and "cruftbox" in ABOUT
     assert "SportsCrawl" in HELP
+
+
+# -- a newcomer's first report ---------------------------------------------
+
+from datetime import date  # noqa: E402
+
+from sportscrawl.market_commands import FIRST_REPORT_INTRO  # noqa: E402
+from sportscrawl.yahoo import Quote  # noqa: E402
+
+THURSDAY = date(2026, 10, 29)
+FRIDAY = date(2026, 10, 30)
+FRIDAY_EVENING = datetime(2026, 10, 30, 23, 0, tzinfo=timezone.utc)  # 7pm New York
+
+
+def latest_on(day):
+    def latest(symbols, now):
+        return [Quote(symbol=s, name=KNOWN.get(s, s), is_index=False, close=101.0,
+                      prev_close=100.0, close_date=day) for s in symbols]
+    return latest
+
+
+def newcomer_bot(db, day):
+    handler = MarketCommandHandler(db, PEPPER, lookup=fake_lookup, latest=latest_on(day))
+
+    def say(text, now):
+        return handler.handle(Message(message_id="m", convo_id=CONVO, sender_did=DID,
+                                      text=text, sent_at=""), now)
+    return say
+
+
+def last_evaluated(db):
+    return db.execute("SELECT last_evaluated_date FROM subscribers WHERE did = ?",
+                      (DID,)).fetchone()[0]
+
+
+def test_first_add_comes_with_the_latest_close(db):
+    # 10am Friday: markets open, so the latest finished close is Thursday's.
+    reply = newcomer_bot(db, THURSDAY)("add AAPL", NOW)
+    assert FIRST_REPORT_INTRO in reply
+    assert "Thu Oct 29 close" in reply and "AAPL 101.00 +1.00%" in reply
+    # Thursday's close doesn't count as Friday's message: Friday's still comes.
+    assert last_evaluated(db) is None
+
+
+def test_after_the_close_the_first_report_is_todays_message(db):
+    reply = newcomer_bot(db, FRIDAY)("add AAPL", FRIDAY_EVENING)
+    assert "Fri Oct 30 close" in reply
+    # Recorded as sent, so the scheduler doesn't send Friday's close again.
+    assert last_evaluated(db) == "2026-10-30"
+
+
+def test_only_the_first_add_gets_a_report(db):
+    bot = newcomer_bot(db, THURSDAY)
+    bot("add AAPL", NOW)
+    assert FIRST_REPORT_INTRO not in bot("add MSFT", NOW)
+
+
+def test_no_report_when_prices_are_unavailable(db):
+    handler = MarketCommandHandler(db, PEPPER, lookup=fake_lookup, latest=lambda s, n: [])
+    reply = handler.handle(Message(message_id="m", convo_id=CONVO, sender_did=DID,
+                                   text="add AAPL", sent_at=""), NOW)
+    assert FIRST_REPORT_INTRO not in reply
+    assert reply.endswith("You'll get closing prices after each market close.")
+
+
+def test_a_report_that_would_not_fit_is_skipped(db):
+    symbols = " ".join("S%03d" % i for i in range(20))
+    reply = newcomer_bot(db, THURSDAY)("add " + symbols, NOW)
+    assert len(reply) <= 1000

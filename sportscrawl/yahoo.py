@@ -202,6 +202,19 @@ def quote_for(history: History, day: date) -> Quote | None:
     )
 
 
+def latest_quote(history: History) -> Quote | None:
+    """The most recent finished close, whatever day it was.
+
+    ELI5: "how did it do last time the market closed?" At 8pm that's today;
+    at 11am or on a Sunday it's the last trading day before.
+    """
+    for bar in reversed(history.bars):
+        quote = quote_for(history, bar.day)
+        if quote is not None:
+            return quote
+    return None
+
+
 def _average_volume(bars) -> float | None:
     """The average volume of these days, or None if there's too little to go on."""
     volumes = [bar.volume for bar in bars if bar.volume]

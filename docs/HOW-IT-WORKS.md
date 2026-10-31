@@ -101,6 +101,10 @@ Bluesky.
   `config` (which sends a link to a web settings page) and `privacy`.
 - marketcrawl's handler (`market_commands.py`) adds `add`, `remove`,
   `list`, `about` and `help`, and passes everything else to the original.
+- Someone's very first `add` is answered with the latest close straight
+  away, whatever the hour, so they see what they signed up for. If that
+  happens to be today's close (they signed up after 4:15pm), it's written
+  down as today's message, so the mail room doesn't send it twice.
 - `run_market_poller.py` is the original `run_poller.py` with the market
   handler plugged in. The Bluesky side (logging in, reading the inbox,
   replying) is the original's code, unchanged.

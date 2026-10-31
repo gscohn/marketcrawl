@@ -29,7 +29,12 @@ from datetime import datetime, timedelta
 
 from . import market_repo, repo
 from .commands import DELETE_PROMPT, STARTED, CommandHandler, normalize
+from .formatter import MAX_MESSAGE
 from .http import FetchError
+from .market_formatter import format_market_digest
+from .models import Sub
+from .nyse_calendar import new_york_date
+from .yahoo import league_for
 
 log = logging.getLogger("sportscrawl.market_commands")
 
@@ -86,6 +91,8 @@ If you like scores as much as stocks, follow @sportscrawl.app.
 Prices: Yahoo Finance. Filings: SEC EDGAR.
 Source: https://github.com/gscohn/marketcrawl"""
 
+FIRST_REPORT_INTRO = "Here's the latest close. You'll get one after every market close from now on."
+
 # A repeat unknown message inside the hour gets this instead of the full
 # help. The original project's reason, kept: a full reply to every message
 # from another bot is an endless loop.
@@ -129,7 +136,8 @@ def parse(text: str):
 
 
 class MarketCommandHandler(CommandHandler):
-    def __init__(self, connection, pepper, lookup, base_url="https://localhost"):
+    def __init__(self, connection, pepper, lookup, base_url="https://localhost",
+                 latest=None):
         # base_url only matters to commands we don't use (the web config
         # link), but the original constructor wants one.
         super().__init__(connection, pepper, base_url)
@@ -137,6 +145,9 @@ class MarketCommandHandler(CommandHandler):
         # no such symbol; raises FetchError if Yahoo can't be reached.
         # Passed in, so tests can fake Yahoo.
         self._lookup = lookup
+        # latest(symbols, now) -> the last finished close for each, for a
+        # newcomer's first report. Optional: without it, no first report.
+        self._latest = latest
 
     def handle(self, message, now: datetime) -> str:
         did = message.sender_did
@@ -210,6 +221,7 @@ class MarketCommandHandler(CommandHandler):
             return "Which symbol? For example: add AAPL"
 
         following = set(market_repo.tickers_for(self._db, did))
+        newcomer = not following
         lines = []
         added = 0
         for symbol in dict.fromkeys(symbols):  # drops repeats, keeps order
@@ -245,8 +257,41 @@ class MarketCommandHandler(CommandHandler):
             # successful add is what switches delivery on.
             market_repo.ensure_market_tz(self._db, did)
             lines.append("")
+            report = self._first_report(following, now) if newcomer else None
+            with_report = "\n".join(lines + [FIRST_REPORT_INTRO, ""] + ([report[0]] if report else []))
+            # One reply, so it has to fit Bluesky's limit. Twenty "Added"
+            # lines plus twenty prices might not; then skip the sample.
+            if report and len(with_report) <= MAX_MESSAGE:
+                text, day = report
+                if day == new_york_date(now):
+                    # This IS today's message. Write that down, the same
+                    # way the scheduler does after a send, or it would send
+                    # it again at 4:15: the original's "never message
+                    # anyone twice" rule.
+                    repo.mark_sent(self._db, did, day)
+                return with_report
             lines.append("You'll get closing prices after each market close.")
         return "\n".join(lines)
+
+    def _first_report(self, symbols, now):
+        """A sample message straight away, so a newcomer doesn't wait until
+        tomorrow afternoon to see what they signed up for.
+
+        It's the last finished close, whatever the hour: at 8pm that's
+        today's, at 11am or on a weekend it's the last trading day's. Returns
+        (text, which day's close) or None if there's nothing to show.
+        """
+        if self._latest is None:
+            return None
+        quotes = self._latest(sorted(symbols), now)
+        if not quotes:
+            return None
+        day = max(q.close_date for q in quotes)
+        subs = [Sub(kind=market_repo.TICKER, league=league_for(s)) for s in symbols]
+        digest = format_market_digest(quotes, subs, market_repo.MARKET_TZ, now, day=day)
+        if digest.kind != "digest":
+            return None
+        return digest.text, day
 
     def _remove(self, did, symbols) -> str:
         if not symbols:

@@ -20,7 +20,7 @@ from .http import FetchError, Fetcher
 from .market_schedule import filing_window
 from .nyse_calendar import new_york_date
 from .source import LeagueHealth, WindowResult
-from .yahoo import ParseError, chart_url, parse_chart, quote_for, symbol_of
+from .yahoo import ParseError, chart_url, latest_quote, parse_chart, quote_for, symbol_of
 
 # How long a download stays fresh. Short, because after the close the
 # scheduler retries every minute while a symbol is late, and each retry
@@ -89,6 +89,19 @@ class YahooSource:
 
         return result
 
+    def latest(self, symbols, now: datetime) -> list:
+        """Each symbol's most recent finished close, for a newcomer's first
+        report. Symbols we can't get are simply left out."""
+        quotes = []
+        for symbol in symbols:
+            try:
+                quote = latest_quote(self.history(symbol, now))
+            except (FetchError, ParseError):
+                continue
+            if quote is not None:
+                quotes.append(quote)
+        return quotes
+
     def lookup(self, symbol: str, now: datetime):
         """Does this symbol exist? For the `add` command.
 
@@ -130,6 +143,9 @@ class MarketSource:
 
     def lookup(self, symbol: str, now: datetime):
         return self._prices.lookup(symbol, now)
+
+    def latest(self, symbols, now: datetime) -> list:
+        return self._prices.latest(symbols, now)
 
     def fetch_window(self, leagues, now: datetime) -> WindowResult:
         leagues = list(leagues)

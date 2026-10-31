@@ -106,3 +106,9 @@ def test_volume_compared_with_the_last_month():
 def test_too_little_history_means_no_volume_verdict():
     quote = quote_for(parse_chart(payload("aapl_5d.json"), "AAPL"), FRIDAY)
     assert quote.volume_ratio is None
+
+
+def test_latest_finished_close():
+    from sportscrawl.yahoo import latest_quote
+
+    assert latest_quote(parse_chart(payload("aapl_5d.json"), "AAPL")).close_date == FRIDAY

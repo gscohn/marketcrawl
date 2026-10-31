@@ -98,15 +98,18 @@ def _render(lines, filing_lines, day, trailers) -> str:
 
 
 def format_market_digest(events, subs, tz: str, now: datetime,
-                         failed_leagues=frozenset()) -> Digest:
+                         failed_leagues=frozenset(), day=None) -> Digest:
     """Assemble one subscriber's message. Same signature as format_digest,
     so the scheduler can call either. `tz` is unused: the market's day is
     New York's day no matter where the reader lives.
 
     `events` is the source's pile: prices (Quotes) and, if filings are
     switched on, SEC filings (Filings). They're sorted apart here.
+
+    `day` is which close to report: today's unless told otherwise. A
+    newcomer's first report asks for the last finished one.
     """
-    day = new_york_date(now)
+    day = day or new_york_date(now)
     quotes = [e for e in events if not isinstance(e, Filing)]
     filings = [e for e in events if isinstance(e, Filing)]
 
