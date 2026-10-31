@@ -6,6 +6,7 @@ ELI5: there's no website to pick your stocks. You just message the bot:
     add MSFT sp500      -> follow Microsoft and the S&P 500 index
     remove AAPL         -> stop following Apple
     list                -> what am I following?
+    test                -> send my closing-prices message now
     help                -> the list of commands
     about               -> where this bot comes from
     stop / start        -> pause / resume messages
@@ -25,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections import deque
 from datetime import datetime, timedelta
 
 from . import market_repo, repo
@@ -33,7 +35,6 @@ from .formatter import MAX_MESSAGE
 from .http import FetchError
 from .market_formatter import format_market_digest
 from .models import Sub
-from .nyse_calendar import new_york_date
 from .yahoo import league_for
 
 log = logging.getLogger("sportscrawl.market_commands")
@@ -63,16 +64,26 @@ REMOVE_WORDS = frozenset({"remove", "rm", "drop", "unfollow", "untrack"})
 LIST_WORDS = frozenset({"list", "ls", "mine"})
 HELP_WORDS = frozenset({"help", "commands", "?"})
 ABOUT_WORDS = frozenset({"about", "credits", "source"})
+TEST_WORDS = frozenset({"test", "preview"})
+
+# `test` downloads prices, so it's rationed. One person can ask once every
+# ten minutes (the answer can't change faster than that anyway: it's the
+# last close). And everyone together gets at most 30 an hour, so a crowd of
+# accounts can't use the bot to hammer Yahoo or flood replies.
+TEST_COOLDOWN = timedelta(minutes=10)
+TEST_HOURLY_LIMIT = 30
 
 HELP = """MarketCrawl sends one message after the US stock market closes, with the closing prices of the symbols you follow, plus any earnings releases and quarterly or annual reports they filed.
 
 add AAPL - follow a symbol (or several: add AAPL MSFT)
 remove AAPL - stop following one
 list - what you follow
+test - get your message now (latest close)
 stop - pause messages
 start - resume messages
 delete - remove all your data
 about - where this bot comes from
+privacy - what we keep
 help - this list
 
 Indexes: sp500, dow, nasdaq
@@ -91,12 +102,12 @@ If you like scores as much as stocks, follow @sportscrawl.app.
 Prices: Yahoo Finance. Filings: SEC EDGAR.
 Source: https://github.com/gscohn/marketcrawl"""
 
-FIRST_REPORT_INTRO = "Here's the latest close. You'll get one after every market close from now on."
+ADDED_OUTRO = "You'll get closing prices after each market close. Send test to see one now."
 
 # A repeat unknown message inside the hour gets this instead of the full
 # help. The original project's reason, kept: a full reply to every message
 # from another bot is an endless loop.
-NUDGE = "Commands: add, remove, list, stop, help"
+NUDGE = "Commands: add, remove, list, test, stop, help"
 HELP_THROTTLE = timedelta(hours=1)
 
 PRIVACY = """We keep: your Bluesky ID, the symbols you follow, and when you were last sent a message. Messages you send are read for commands and not stored. delete removes everything."""
@@ -145,9 +156,14 @@ class MarketCommandHandler(CommandHandler):
         # no such symbol; raises FetchError if Yahoo can't be reached.
         # Passed in, so tests can fake Yahoo.
         self._lookup = lookup
-        # latest(symbols, now) -> the last finished close for each, for a
-        # newcomer's first report. Optional: without it, no first report.
+        # latest(symbols, now) -> the last finished close for each, for
+        # `test`. Optional: without it, `test` says prices are unavailable.
         self._latest = latest
+        # When each person last ran `test`, and when anyone did in the last
+        # hour. Kept in memory, not the database: a restart forgetting them
+        # only means someone may test a little early, which is harmless.
+        self._last_test = {}
+        self._recent_tests = deque()
 
     def handle(self, message, now: datetime) -> str:
         did = message.sender_did
@@ -166,6 +182,8 @@ class MarketCommandHandler(CommandHandler):
                 return self._remove(did, symbols)
             if kind == "list":
                 return self._list(did)
+            if kind == "test":
+                return self._test(did, now)
             if kind == "privacy":
                 return PRIVACY
             if kind == "about":
@@ -221,7 +239,6 @@ class MarketCommandHandler(CommandHandler):
             return "Which symbol? For example: add AAPL"
 
         following = set(market_repo.tickers_for(self._db, did))
-        newcomer = not following
         lines = []
         added = 0
         for symbol in dict.fromkeys(symbols):  # drops repeats, keeps order
@@ -257,30 +274,50 @@ class MarketCommandHandler(CommandHandler):
             # successful add is what switches delivery on.
             market_repo.ensure_market_tz(self._db, did)
             lines.append("")
-            report = self._first_report(following, now) if newcomer else None
-            with_report = "\n".join(lines + [FIRST_REPORT_INTRO, ""] + ([report[0]] if report else []))
-            # One reply, so it has to fit Bluesky's limit. Twenty "Added"
-            # lines plus twenty prices might not; then skip the sample.
-            if report and len(with_report) <= MAX_MESSAGE:
-                text, day = report
-                if day == new_york_date(now):
-                    # This IS today's message. Write that down, the same
-                    # way the scheduler does after a send, or it would send
-                    # it again at 4:15: the original's "never message
-                    # anyone twice" rule.
-                    repo.mark_sent(self._db, did, day)
-                return with_report
-            lines.append("You'll get closing prices after each market close.")
+            lines.append(ADDED_OUTRO)
         return "\n".join(lines)
 
-    def _first_report(self, symbols, now):
-        """A sample message straight away, so a newcomer doesn't wait until
-        tomorrow afternoon to see what they signed up for.
+    def _test(self, did, now) -> str:
+        """Send this person's message right now, built from the last
+        finished close, exactly as the after-close message would look.
 
-        It's the last finished close, whatever the hour: at 8pm that's
-        today's, at 11am or on a weekend it's the last trading day's. Returns
-        (text, which day's close) or None if there's nothing to show.
-        """
+        It doesn't count as that day's message: the regular one still
+        arrives after the next close. Rationed (see TEST_COOLDOWN)."""
+        symbols = market_repo.tickers_for(self._db, did)
+        if not symbols:
+            return "You're not following anything yet. Try: add AAPL"
+
+        last = self._last_test.get(did)
+        if last is not None and now - last < TEST_COOLDOWN:
+            wait = TEST_COOLDOWN - (now - last)
+            minutes = max(1, -(-int(wait.total_seconds()) // 60))  # round up
+            return "You can test again in %d min." % minutes
+
+        # Forget tests older than an hour, then check the shared limit.
+        while self._recent_tests and now - self._recent_tests[0] >= timedelta(hours=1):
+            self._recent_tests.popleft()
+        if len(self._recent_tests) >= TEST_HOURLY_LIMIT:
+            return "Lots of tests right now. Try again in a little while."
+
+        # Count it before fetching, so a failed fetch still uses up a turn.
+        self._last_test[did] = now
+        self._recent_tests.append(now)
+        # Tidy up anyone whose cooldown is long over, so this never grows.
+        for old in [d for d, t in self._last_test.items() if now - t >= TEST_COOLDOWN]:
+            del self._last_test[old]
+
+        try:
+            report = self._latest_report(symbols, now)
+        except FetchError:
+            report = None
+        if report is None or len(report) > MAX_MESSAGE:
+            return "Couldn't get prices right now. Try again later."
+        return report
+
+    def _latest_report(self, symbols, now):
+        """The message for the last finished close, whatever the hour: at
+        8pm that's today's, at 11am or on a weekend it's the last trading
+        day's. None if there's nothing to show."""
         if self._latest is None:
             return None
         quotes = self._latest(sorted(symbols), now)
@@ -291,7 +328,7 @@ class MarketCommandHandler(CommandHandler):
         digest = format_market_digest(quotes, subs, market_repo.MARKET_TZ, now, day=day)
         if digest.kind != "digest":
             return None
-        return digest.text, day
+        return digest.text
 
     def _remove(self, did, symbols) -> str:
         if not symbols:
@@ -321,7 +358,7 @@ def _kind(verb: str) -> str:
         return verb
     for name, words in (("add", ADD_WORDS), ("remove", REMOVE_WORDS),
                         ("list", LIST_WORDS), ("help", HELP_WORDS),
-                        ("about", ABOUT_WORDS)):
+                        ("about", ABOUT_WORDS), ("test", TEST_WORDS)):
         if verb in words:
             return name
     return "unknown"

@@ -1,0 +1,10 @@
+# Run the backup at noon New York time, when nothing is being sent.
+[Unit]
+Description=Daily marketcrawl database backup
+
+[Timer]
+OnCalendar=*-*-* 12:00:00 America/New_York
+Persistent=true
+
+[Install]
+WantedBy=timers.target

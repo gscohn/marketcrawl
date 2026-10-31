@@ -1,0 +1,12 @@
+# A daily copy of the subscriber database, kept on the server for 14 days.
+# The off-server copy is the hosting provider's weekly backup of the whole
+# machine. Started by marketcrawl-backup.timer.
+[Unit]
+Description=marketcrawl database backup
+
+[Service]
+Type=oneshot
+User=marketcrawl
+WorkingDirectory=/home/marketcrawl/app
+Environment=DATABASE_PATH=/home/marketcrawl/marketcrawl.db
+ExecStart=/home/marketcrawl/app/deploy/market/backup_market.sh

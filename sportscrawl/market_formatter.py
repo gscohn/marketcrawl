@@ -114,7 +114,7 @@ def format_market_digest(events, subs, tz: str, now: datetime,
     switched on, SEC filings (Filings). They're sorted apart here.
 
     `day` is which close to report: today's unless told otherwise. A
-    newcomer's first report asks for the last finished one.
+    `test` command asks for the last finished one.
     """
     day = day or new_york_date(now)
     # (The pile can also hold the market's biggest movers, which are only

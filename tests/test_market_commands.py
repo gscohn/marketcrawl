@@ -234,30 +234,31 @@ def test_about_credits_sportscrawl(bot):
     assert "SportsCrawl" in HELP
 
 
-# -- a newcomer's first report ---------------------------------------------
+# -- test: the message for the latest close, on demand ------------------------
 
 from datetime import date  # noqa: E402
 
-from sportscrawl.market_commands import FIRST_REPORT_INTRO  # noqa: E402
+from sportscrawl.market_commands import (  # noqa: E402
+    ADDED_OUTRO, TEST_COOLDOWN, TEST_HOURLY_LIMIT)
 from sportscrawl.yahoo import Quote  # noqa: E402
 
 THURSDAY = date(2026, 10, 29)
-FRIDAY = date(2026, 10, 30)
-FRIDAY_EVENING = datetime(2026, 10, 30, 23, 0, tzinfo=timezone.utc)  # 7pm New York
 
 
-def latest_on(day):
+def latest_on(day, calls=None):
     def latest(symbols, now):
+        if calls is not None:
+            calls.append(list(symbols))
         return [Quote(symbol=s, name=KNOWN.get(s, s), is_index=False, close=101.0,
                       prev_close=100.0, close_date=day) for s in symbols]
     return latest
 
 
-def newcomer_bot(db, day):
-    handler = MarketCommandHandler(db, PEPPER, lookup=fake_lookup, latest=latest_on(day))
+def bot_with(db, latest):
+    handler = MarketCommandHandler(db, PEPPER, lookup=fake_lookup, latest=latest)
 
-    def say(text, now):
-        return handler.handle(Message(message_id="m", convo_id=CONVO, sender_did=DID,
+    def say(text, now=NOW, did=DID):
+        return handler.handle(Message(message_id="m", convo_id="c-" + did, sender_did=did,
                                       text=text, sent_at=""), now)
     return say
 
@@ -267,37 +268,62 @@ def last_evaluated(db):
                       (DID,)).fetchone()[0]
 
 
-def test_first_add_comes_with_the_latest_close(db):
-    # 10am Friday: markets open, so the latest finished close is Thursday's.
-    reply = newcomer_bot(db, THURSDAY)("add AAPL", NOW)
-    assert FIRST_REPORT_INTRO in reply
+def test_add_just_confirms_and_points_at_test(db):
+    reply = bot_with(db, latest_on(THURSDAY))("add AAPL")
+    assert reply == "Added AAPL (Apple Inc.).\n\n" + ADDED_OUTRO
+
+
+def test_test_sends_the_latest_close(db):
+    bot = bot_with(db, latest_on(THURSDAY))
+    bot("add AAPL")
+    reply = bot("test")
     assert "Thu Oct 29 close" in reply and "AAPL 101.00 +1.00%" in reply
-    # Thursday's close doesn't count as Friday's message: Friday's still comes.
+    # A preview, not the day's message: the regular one still comes.
     assert last_evaluated(db) is None
 
 
-def test_after_the_close_the_first_report_is_todays_message(db):
-    reply = newcomer_bot(db, FRIDAY)("add AAPL", FRIDAY_EVENING)
-    assert "Fri Oct 30 close" in reply
-    # Recorded as sent, so the scheduler doesn't send Friday's close again.
-    assert last_evaluated(db) == "2026-10-30"
+def test_test_with_nothing_followed(db):
+    assert "not following anything" in bot_with(db, latest_on(THURSDAY))("test")
 
 
-def test_only_the_first_add_gets_a_report(db):
-    bot = newcomer_bot(db, THURSDAY)
-    bot("add AAPL", NOW)
-    assert FIRST_REPORT_INTRO not in bot("add MSFT", NOW)
+def test_test_is_once_per_person_per_cooldown(db):
+    calls = []
+    bot = bot_with(db, latest_on(THURSDAY, calls))
+    bot("add AAPL")
+    bot("test")
+    assert bot("test", NOW + timedelta(minutes=3)) == "You can test again in 7 min."
+    assert len(calls) == 1  # the refused one never touched Yahoo
+    assert "close" in bot("test", NOW + TEST_COOLDOWN)
 
 
-def test_no_report_when_prices_are_unavailable(db):
-    handler = MarketCommandHandler(db, PEPPER, lookup=fake_lookup, latest=lambda s, n: [])
-    reply = handler.handle(Message(message_id="m", convo_id=CONVO, sender_did=DID,
-                                   text="add AAPL", sent_at=""), NOW)
-    assert FIRST_REPORT_INTRO not in reply
-    assert reply.endswith("You'll get closing prices after each market close.")
+def test_test_has_a_shared_hourly_limit(db):
+    calls = []
+    bot = bot_with(db, latest_on(THURSDAY, calls))
+    for i in range(TEST_HOURLY_LIMIT + 1):
+        bot("add AAPL", did="did:plc:p%d" % i)
+    for i in range(TEST_HOURLY_LIMIT):
+        assert "close" in bot("test", did="did:plc:p%d" % i)
+    late = "did:plc:p%d" % TEST_HOURLY_LIMIT
+    assert bot("test", did=late).startswith("Lots of tests")
+    assert len(calls) == TEST_HOURLY_LIMIT
+    # An hour later the window has moved on.
+    assert "close" in bot("test", NOW + timedelta(hours=1), did=late)
 
 
-def test_a_report_that_would_not_fit_is_skipped(db):
-    symbols = " ".join("S%03d" % i for i in range(20))
-    reply = newcomer_bot(db, THURSDAY)("add " + symbols, NOW)
-    assert len(reply) <= 1000
+def test_test_when_prices_are_unavailable(db):
+    bot = bot_with(db, lambda s, n: [])
+    bot("add AAPL")
+    assert bot("test") == "Couldn't get prices right now. Try again later."
+
+
+def test_test_when_yahoo_is_down(db):
+    def down(symbols, now):
+        raise FetchError("http 503")
+    bot = bot_with(db, down)
+    bot("add AAPL")
+    assert bot("test") == "Couldn't get prices right now. Try again later."
+
+
+def test_help_lists_test_and_privacy_and_fits(bot):
+    assert "test - " in HELP and "privacy - " in HELP
+    assert len(HELP) <= 1000

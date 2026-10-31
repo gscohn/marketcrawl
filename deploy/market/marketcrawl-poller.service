@@ -1,0 +1,30 @@
+# The "front desk": checks the bot's Bluesky DMs every 20 seconds and
+# answers commands (add, remove, list, test...). Installed by
+# setup_market_server.sh.
+[Unit]
+Description=marketcrawl DM poller (answers commands)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=marketcrawl
+WorkingDirectory=/home/marketcrawl/app
+# Secrets (Bluesky login, pepper) come from the env file; the database path
+# is set here so the env file only ever holds secrets.
+EnvironmentFile=/home/marketcrawl/.env
+Environment=DATABASE_PATH=/home/marketcrawl/marketcrawl.db
+Environment=SPORTSCRAWL_ENV_FILE=/home/marketcrawl/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/marketcrawl/app/.venv/bin/python run_market_poller.py
+# If it crashes, or its own watchdog (watchdog.py) kills it for being stuck,
+# start it again.
+Restart=always
+RestartSec=10
+# Lock it down: it can only write inside its own home folder.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/marketcrawl
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

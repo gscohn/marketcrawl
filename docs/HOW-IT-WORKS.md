@@ -118,11 +118,13 @@ Bluesky.
 - sportscrawl's handler (`commands.py`) knows `stop`, `start`, `delete`,
   `config` (which sends a link to a web settings page) and `privacy`.
 - marketcrawl's handler (`market_commands.py`) adds `add`, `remove`,
-  `list`, `about` and `help`, and passes everything else to the original.
-- Someone's very first `add` is answered with the latest close straight
-  away, whatever the hour, so they see what they signed up for. If that
-  happens to be today's close (they signed up after 4:15pm), it's written
-  down as today's message, so the mail room doesn't send it twice.
+  `list`, `test`, `about` and `help`, and passes everything else to the
+  original.
+- `test` answers with the message for the latest close straight away,
+  whatever the hour, so people can see what they signed up for. It doesn't
+  count as that day's message. It's rationed: once per person every 10
+  minutes, and 30 an hour for everyone together, because each one downloads
+  prices.
 - `run_market_poller.py` is the original `run_poller.py` with the market
   handler plugged in. The Bluesky side (logging in, reading the inbox,
   replying) is the original's code, unchanged.
@@ -174,6 +176,25 @@ an app password with DM access):
 
 `--only` is the original project's safety catch: while testing, the bot
 refuses to message anyone not on that list.
+
+## Running it on a server
+
+Everything for a server is in `deploy/market/`. It expects a fresh Ubuntu
+24.04 machine you can SSH into as root.
+
+1. `ssh root@<server> 'bash -s' < deploy/market/setup_market_server.sh`
+   installs everything, makes a `marketcrawl` user, downloads the code and
+   locks the machine down to key-only SSH. It doesn't start the bot.
+2. On the server, fill in `/home/marketcrawl/.env` (the Bluesky login and
+   the pepper). Use a separate Bluesky app password from the one on your
+   own computer, so either can be revoked alone.
+3. `systemctl start marketcrawl-poller marketcrawl-scheduler`.
+
+After that, `deploy/market/deploy_market.sh` (run on the server) updates it
+to the latest code on GitHub. Logs: `journalctl -u marketcrawl-poller` (or
+`-scheduler`). A backup of the database is taken daily at noon New York time
+into `/home/marketcrawl/backups` and kept for 14 days; keep a copy off the
+machine too (for example, your hosting provider's backups).
 
 ## Known limits
 

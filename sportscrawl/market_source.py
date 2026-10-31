@@ -135,8 +135,8 @@ class YahooSource:
         return result
 
     def latest(self, symbols, now: datetime) -> list:
-        """Each symbol's most recent finished close, for a newcomer's first
-        report. Symbols we can't get are simply left out."""
+        """Each symbol's most recent finished close, for the `test`
+        command. Symbols we can't get are simply left out."""
         quotes = []
         for symbol in symbols:
             try:

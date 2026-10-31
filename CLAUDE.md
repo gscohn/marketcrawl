@@ -6,7 +6,7 @@ sports scores. Read `docs/HOW-IT-WORKS.md` first.
 ## Rules
 - **Leave upstream files alone where possible.** New behaviour goes in new
   files (`sportscrawl/market_*.py`, `yahoo.py`, `edgar*.py`,
-  `nyse_calendar.py`, `*_market*.py`, `dev_dm.py`). Changes to upstream files should be small,
+  `nyse_calendar.py`, `*_market*.py`, `dev_dm.py`, `deploy/market/`). Changes to upstream files should be small,
   optional, and default to the original behaviour, so `git pull upstream main`
   stays easy. Right now only `scheduler.py` and `http.py` differ from upstream.
 - **Comment new code for a beginner (ELI5):** say what a piece does and why
