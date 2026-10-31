@@ -45,8 +45,18 @@ MAX_TICKERS = 20
 
 # What a symbol may look like: 1-10 of capital letters, digits, and the few
 # punctuation marks Yahoo uses. ^GSPC (an index), BRK-B (a share class),
-# EURUSD=X (a currency pair).
-SYMBOL = re.compile(r"^[A-Z0-9.\-\^=]{1,10}$")
+# EURUSD=X (a currency pair). At least one letter or digit, so ".." can't
+# sneak into a Yahoo web address.
+SYMBOL = re.compile(r"^(?=.*[A-Z0-9])[A-Z0-9.\-\^=]{1,10}$")
+
+# Guards against one huge message. A stranger could otherwise send `add`
+# followed by hundreds of made-up symbols: hundreds of Yahoo lookups, and a
+# reply too long for Bluesky to accept, which the poller would retry forever.
+# So: read at most MAX_TICKERS words, give up after a few lookups that find
+# nothing, never echo more than a short piece of each word, and trim the
+# reply to fit.
+MAX_FAILED_LOOKUPS = 5
+ECHO_CHARS = 12
 
 # Friendly names for the three indexes people ask for most.
 ALIASES = {
@@ -168,6 +178,8 @@ class MarketCommandHandler(CommandHandler):
     def handle(self, message, now: datetime) -> str:
         did = message.sender_did
         verb, symbols = parse(message.text)
+        too_many = len(symbols) > MAX_TICKERS
+        symbols = symbols[:MAX_TICKERS]
 
         kind = _kind(verb)
         if kind != "unknown":
@@ -176,10 +188,12 @@ class MarketCommandHandler(CommandHandler):
             log.info("command did=%s matched=%s", did, kind)
             self._first_contact(message, now)
 
-            if kind == "add":
-                return self._add(did, symbols, now)
-            if kind == "remove":
-                return self._remove(did, symbols)
+            if kind in ("add", "remove"):
+                reply = (self._add(did, symbols, now) if kind == "add"
+                         else self._remove(did, symbols))
+                if too_many:
+                    reply += "\n(Only the first %d were read.)" % MAX_TICKERS
+                return _fit(reply)
             if kind == "list":
                 return self._list(did)
             if kind == "test":
@@ -241,9 +255,13 @@ class MarketCommandHandler(CommandHandler):
         following = set(market_repo.tickers_for(self._db, did))
         lines = []
         added = 0
+        failed = 0
         for symbol in dict.fromkeys(symbols):  # drops repeats, keeps order
+            if failed >= MAX_FAILED_LOOKUPS:
+                lines.append("Stopped after %d that didn't work. Check the spelling." % failed)
+                break
             if not SYMBOL.match(symbol):
-                lines.append("%s doesn't look like a symbol." % symbol)
+                lines.append("%s doesn't look like a symbol." % _echo(symbol))
                 continue
             if symbol in following:
                 lines.append("Already following %s." % symbol)
@@ -255,9 +273,11 @@ class MarketCommandHandler(CommandHandler):
                 typed = symbol
                 symbol, found = self._find(symbol, now)
             except FetchError:
+                failed += 1
                 lines.append("Couldn't check %s right now. Try again later." % typed)
                 continue
             if found is None:
+                failed += 1
                 lines.append("Couldn't find %s." % typed)
                 continue
             if symbol in following:
@@ -338,7 +358,7 @@ class MarketCommandHandler(CommandHandler):
             if market_repo.remove_ticker(self._db, did, symbol):
                 lines.append("Removed %s." % symbol)
             else:
-                lines.append("You weren't following %s." % symbol)
+                lines.append("You weren't following %s." % _echo(symbol))
         if not market_repo.tickers_for(self._db, did):
             lines.append("")
             lines.append("You're not following anything now, so no messages until you add one.")
@@ -349,6 +369,19 @@ class MarketCommandHandler(CommandHandler):
         if not tickers:
             return "You're not following anything yet. Try: add AAPL"
         return "You follow (%d of %d):\n%s" % (len(tickers), MAX_TICKERS, " ".join(tickers))
+
+
+def _echo(word: str) -> str:
+    """A word from the message, shortened before it goes into a reply."""
+    return word if len(word) <= ECHO_CHARS else word[:ECHO_CHARS] + "\u2026"
+
+
+def _fit(text: str) -> str:
+    """Drop lines from the end until the reply fits in one Bluesky DM."""
+    lines = text.split("\n")
+    while len("\n".join(lines)) > MAX_MESSAGE and len(lines) > 1:
+        lines.pop()
+    return "\n".join(lines)[:MAX_MESSAGE]
 
 
 def _kind(verb: str) -> str:

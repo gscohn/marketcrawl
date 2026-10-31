@@ -327,3 +327,31 @@ def test_test_when_yahoo_is_down(db):
 def test_help_lists_test_and_privacy_and_fits(bot):
     assert "test - " in HELP and "privacy - " in HELP
     assert len(HELP) <= 1000
+
+
+# -- one huge message can't jam the bot -----------------------------------------
+
+
+def test_a_flood_of_made_up_symbols_stops_early(db):
+    calls = []
+
+    def counting_lookup(symbol, now):
+        calls.append(symbol)
+        return fake_lookup(symbol, now)
+    handler = MarketCommandHandler(db, PEPPER, lookup=counting_lookup)
+    text = "add " + " ".join("ZZQ%d" % i for i in range(300))
+    reply = handler.handle(Message(message_id="m", convo_id=CONVO, sender_did=DID,
+                                   text=text, sent_at=""), NOW)
+    assert len(calls) <= 5
+    assert "Stopped after 5" in reply and "Only the first 20" in reply
+    assert len(reply) <= 1000
+
+
+def test_a_huge_remove_still_fits_in_one_reply(bot):
+    reply = bot("remove " + " ".join("x" * 40 for _ in range(300)))
+    assert len(reply) <= 1000
+    assert "X" * 13 not in reply  # long words are shortened when echoed
+
+
+def test_dots_alone_are_not_a_symbol(bot):
+    assert "doesn't look like a symbol" in bot("add ..")
