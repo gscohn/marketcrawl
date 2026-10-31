@@ -61,7 +61,8 @@ def main(argv=None) -> int:
     # Three months of history so every replayed day has a "day before" to
     # compare with. A long cache life, because the pretend clock jumps a day
     # at a time and we don't want to re-download for every jump.
-    source = YahooSource(ttl=timedelta(days=365), range_="3mo")
+    source = YahooSource(ttl=timedelta(days=365), range_="3mo",
+                         long_ttl=timedelta(days=365))
     scheduler = build(path, PEPPER, sender=printer, source=source)
     db = scheduler._db
 

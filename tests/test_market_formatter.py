@@ -146,3 +146,14 @@ def test_filings_are_dropped_before_prices():
     assert len(text) <= MAX_MESSAGE
     assert all(s in text for s in symbols)  # every price survived
     assert text.splitlines()[-1].endswith("more")
+
+
+def test_milestones_get_their_own_emoji():
+    from sportscrawl.market_formatter import LOW_52W, RECORD_HIGH
+
+    top = Quote(symbol="AAPL", name="Apple", is_index=False, close=101, prev_close=100,
+                close_date=FRIDAY, record_high=True)
+    bottom = Quote(symbol="AAPL", name="Apple", is_index=False, close=99, prev_close=100,
+                   close_date=FRIDAY, low_52w=True)
+    assert first_line(top).endswith(RECORD_HIGH)
+    assert first_line(bottom).endswith(LOW_52W)

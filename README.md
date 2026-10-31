@@ -16,8 +16,9 @@ Filings
 AAPL earnings release (8-K) https://www.sec.gov/Archives/edgar/data/...
 ```
 
-📈 up, 📉 down, 🚀/💥 a big day (5% or more; 2% for an index), 🔊 twice the
-usual trading volume.
+📈 up, 📉 down, 🚀/💥 a big day (5% or more; 2% for an index), 🎩 an
+all-time high close, 🕳️ the lowest close in a year, 🔊 twice the usual
+trading volume.
 
 DM it `add AAPL`, `remove AAPL`, `list`, `about` or `help`. It sends nothing
 on weekends and market holidays.

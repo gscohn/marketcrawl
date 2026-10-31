@@ -24,6 +24,11 @@ def body(name):
     return (FIXTURES / name).read_text(encoding="utf-8")
 
 
+def price_calls(transport):
+    """Just the short price downloads, not the once-a-day full history."""
+    return [url for url in transport.calls if "period1=" not in url]
+
+
 class FakeTransport:
     def __init__(self, replies):
         self.replies = replies
@@ -64,14 +69,14 @@ def test_one_download_per_symbol_however_many_followers(transport):
     source = source_for(transport)
     source.fetch_window([AAPL], AFTER_CLOSE)
     source.fetch_window([AAPL], AFTER_CLOSE + timedelta(seconds=30))
-    assert len(transport.calls) == 1
+    assert len(price_calls(transport)) == 1
 
 
 def test_cache_expires(transport):
     source = source_for(transport)
     source.fetch_window([AAPL], AFTER_CLOSE)
     source.fetch_window([AAPL], AFTER_CLOSE + timedelta(minutes=5))
-    assert len(transport.calls) == 2
+    assert len(price_calls(transport)) == 2
 
 
 def test_a_broken_symbol_fails_alone(transport):
@@ -136,3 +141,10 @@ def test_filings_ride_along_with_prices(transport):
 def test_without_filings_it_is_just_prices(transport):
     result = MarketSource(source_for(transport)).fetch_window([AAPL], AFTER_CLOSE)
     assert [type(e).__name__ for e in result.events] == ["Quote"]
+
+
+def test_milestones_never_hold_up_a_price(transport):
+    # The fake has no full history (it answers 404), so the price still
+    # arrives, just without a top hat.
+    result = source_for(transport).fetch_window([AAPL], AFTER_CLOSE)
+    assert [q.record_high for q in result.events] == [False]

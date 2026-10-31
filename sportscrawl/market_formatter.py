@@ -6,7 +6,7 @@ follows, write the text of their message, e.g.
     Fri Oct 30 close
 
     📉 S&P 500 7,580.07 -1.82%
-    🚀 NVDA 210.40 +7.12% 🔊
+    🚀 NVDA 210.40 +7.12% 🎩 🔊
     📉 AAPL 344.63 -1.23%
 
     Filings
@@ -35,6 +35,8 @@ FLAT = "\N{HEAVY MINUS SIGN}"
 BIG_UP = "\N{ROCKET}"
 BIG_DOWN = "\N{COLLISION SYMBOL}"
 BUSY = "\N{SPEAKER WITH THREE SOUND WAVES}"
+RECORD_HIGH = "\N{TOP HAT}"  # dressed up: the best close it has ever had
+LOW_52W = "\N{HOLE}\N{VARIATION SELECTOR-16}"  # hit bottom: lowest close in a year
 
 # What counts as a big day. Indexes move less than single stocks (they're
 # an average of hundreds), so a smaller move is already big news for them.
@@ -73,6 +75,10 @@ def _line(quote) -> str:
     # "{:+.2f}" means: always show the sign, + or -.
     line = "%s %s %s %s%%" % (arrow, label, "{:,.2f}".format(quote.close),
                               "{:+.2f}".format(quote.pct))
+    if quote.record_high:
+        line += " " + RECORD_HIGH
+    if quote.low_52w:
+        line += " " + LOW_52W
     ratio = quote.volume_ratio
     if ratio is not None and ratio >= BUSY_VOLUME:
         line += " " + BUSY

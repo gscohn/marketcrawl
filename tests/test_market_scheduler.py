@@ -19,6 +19,11 @@ DID = "did:plc:investor"
 DUE = datetime(2026, 10, 30, 20, 15, tzinfo=timezone.utc)
 
 
+def price_calls(transport):
+    """Just the short price downloads, not the once-a-day full history."""
+    return [url for url in transport.calls if "period1=" not in url]
+
+
 class Transport:
     def __init__(self):
         self.calls = []
@@ -59,7 +64,7 @@ def test_only_fetches_what_people_follow(world):
     scheduler, db, _, transport = world
     market_repo.add_ticker(db, DID, "AAPL")
     scheduler.tick(DUE)
-    assert transport.calls == [chart_url("AAPL")]
+    assert price_calls(transport) == [chart_url("AAPL")]
 
 
 def test_a_missing_price_is_retried_then_reported(world):

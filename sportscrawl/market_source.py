@@ -20,12 +20,16 @@ from .http import FetchError, Fetcher
 from .market_schedule import filing_window
 from .nyse_calendar import new_york_date
 from .source import LeagueHealth, WindowResult
-from .yahoo import ParseError, chart_url, latest_quote, parse_chart, quote_for, symbol_of
+from .yahoo import (ParseError, chart_url, extremes, full_history_url, latest_quote,
+                    mark_milestones, parse_chart, quote_for, symbol_of)
 
 # How long a download stays fresh. Short, because after the close the
 # scheduler retries every minute while a symbol is late, and each retry
 # should see new data.
 CHART_TTL = timedelta(minutes=2)
+# The full history (for record highs and 52-week lows) is big and only
+# matters up to yesterday, so it's downloaded about once a day.
+LONG_TTL = timedelta(hours=12)
 
 # Yahoo refuses known library names (python-requests, curl) with a 429 and
 # serves a plain product name. So we say who we are, honestly.
@@ -39,13 +43,15 @@ class _CacheEntry:
 
 
 class YahooSource:
-    def __init__(self, fetcher=None, ttl=CHART_TTL, range_="1mo"):
+    def __init__(self, fetcher=None, ttl=CHART_TTL, range_="1mo", long_ttl=LONG_TTL):
         self._fetcher = fetcher or Fetcher(user_agent=USER_AGENT)
         self._ttl = ttl
         # How much history to ask for. A month covers yesterday's close and
         # "normal" volume; replay asks for more so it can walk back in time.
         self._range = range_
         self._charts = {}
+        self._long_ttl = long_ttl
+        self._long = {}
         self.health = {}
 
     def history(self, symbol: str, now: datetime):
@@ -58,6 +64,27 @@ class YahooSource:
         history = parse_chart(payload, symbol)
         self._charts[symbol] = _CacheEntry(fetched_at=now, history=history)
         return history
+
+    def milestones(self, quote, now: datetime):
+        """Mark a quote as a record high or 52-week low if it is one.
+
+        Nice to have, never essential: if the long history can't be had,
+        the quote goes out unmarked rather than late.
+        """
+        cached = self._long.get(quote.symbol)
+        if cached is None or now - cached.fetched_at >= self._long_ttl:
+            try:
+                payload = self._fetcher.get_json(full_history_url(quote.symbol))
+                history = parse_chart(payload, quote.symbol)
+            except (FetchError, ParseError):
+                # Remember the failure too (as None), so a missing history
+                # isn't re-downloaded every minute.
+                history = None
+            cached = _CacheEntry(fetched_at=now, history=history)
+            self._long[quote.symbol] = cached
+        if cached.history is None:
+            return quote
+        return mark_milestones(quote, extremes(cached.history, quote.close_date))
 
     def fetch_window(self, leagues, now: datetime) -> WindowResult:
         """Closing prices for today's New York session, for every symbol.
@@ -85,7 +112,7 @@ class YahooSource:
             health.last_success_at = now
             health.consecutive_failures = 0
             health.last_event_date = quote.close_date
-            result.events.append(quote)
+            result.events.append(self.milestones(quote, now))
 
         return result
 
@@ -99,7 +126,7 @@ class YahooSource:
             except (FetchError, ParseError):
                 continue
             if quote is not None:
-                quotes.append(quote)
+                quotes.append(self.milestones(quote, now))
         return quotes
 
     def lookup(self, symbol: str, now: datetime):
@@ -146,6 +173,27 @@ class MarketSource:
 
     def latest(self, symbols, now: datetime) -> list:
         return self._prices.latest(symbols, now)
+
+    def milestones(self, quote, now: datetime):
+        """Mark a quote as a record high or 52-week low if it is one.
+
+        Nice to have, never essential: if the long history can't be had,
+        the quote goes out unmarked rather than late.
+        """
+        cached = self._long.get(quote.symbol)
+        if cached is None or now - cached.fetched_at >= self._long_ttl:
+            try:
+                payload = self._fetcher.get_json(full_history_url(quote.symbol))
+                history = parse_chart(payload, quote.symbol)
+            except (FetchError, ParseError):
+                # Remember the failure too (as None), so a missing history
+                # isn't re-downloaded every minute.
+                history = None
+            cached = _CacheEntry(fetched_at=now, history=history)
+            self._long[quote.symbol] = cached
+        if cached.history is None:
+            return quote
+        return mark_milestones(quote, extremes(cached.history, quote.close_date))
 
     def fetch_window(self, leagues, now: datetime) -> WindowResult:
         leagues = list(leagues)

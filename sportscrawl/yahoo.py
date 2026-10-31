@@ -15,8 +15,8 @@ never a guess.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from dataclasses import dataclass, replace
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -76,6 +76,9 @@ class Quote:
     # Yahoo didn't give us enough to say (some indexes have no volume).
     volume: int | None = None
     avg_volume: float | None = None
+    # Milestones, filled in when we have the long history (see extremes()).
+    record_high: bool = False  # highest close ever
+    low_52w: bool = False  # lowest close in a year
 
     @property
     def league(self) -> str:
@@ -119,6 +122,46 @@ def chart_url(symbol: str, range_: str = "1mo") -> str:
     weekend, and enough earlier days to know what "normal volume" looks like.
     Replay asks for more."""
     return "%s/%s?range=%s&interval=1d" % (CHART_API, symbol, range_)
+
+
+def full_history_url(symbol: str) -> str:
+    """Every trading day since the symbol began. Asking with range=max gets
+    you one point every few months instead, which misses most peaks; asking
+    "from 1970 until the far future, daily" gets every day. About 1MB."""
+    return "%s/%s?period1=0&period2=9999999999&interval=1d" % (CHART_API, symbol)
+
+
+@dataclass(frozen=True)
+class Extremes:
+    """The best and worst closes before some day, to compare that day with."""
+
+    record_close: float | None  # highest close ever
+    low_52w: float | None  # lowest close in the year before; None if under a year old
+
+
+def extremes(history: History, day: date) -> Extremes:
+    """ELI5: before `day`, what was the highest close ever, and the lowest
+    close in the past year? If `day` beats either, it's a milestone."""
+    prior = [bar for bar in history.bars if bar.day < day]
+    if not prior:
+        return Extremes(None, None)
+    year_ago = day - timedelta(days=365)
+    last_year = [bar.close for bar in prior if bar.day >= year_ago]
+    # A stock that listed six months ago has no "52-week" low yet.
+    old_enough = prior[0].day <= year_ago
+    return Extremes(
+        record_close=max(bar.close for bar in prior),
+        low_52w=min(last_year) if old_enough and last_year else None,
+    )
+
+
+def mark_milestones(quote: Quote, found: Extremes) -> Quote:
+    """The same quote, with record_high / low_52w switched on if earned."""
+    return replace(
+        quote,
+        record_high=found.record_close is not None and quote.close > found.record_close,
+        low_52w=found.low_52w is not None and quote.close < found.low_52w,
+    )
 
 
 def _utc(seconds) -> datetime:

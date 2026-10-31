@@ -112,3 +112,48 @@ def test_latest_finished_close():
     from sportscrawl.yahoo import latest_quote
 
     assert latest_quote(parse_chart(payload("aapl_5d.json"), "AAPL")).close_date == FRIDAY
+
+
+# -- record highs and 52-week lows -----------------------------------------
+
+from datetime import timedelta  # noqa: E402
+
+from sportscrawl.yahoo import Bar, History, extremes, mark_milestones  # noqa: E402
+
+
+def made_up(closes, last_day=FRIDAY):
+    """A history with one close per calendar day, ending on last_day."""
+    bars = tuple(Bar(day=last_day - timedelta(days=len(closes) - 1 - i), close=c)
+                 for i, c in enumerate(closes))
+    return History(symbol="X", name="X", is_index=False, bars=bars,
+                   market_time=None, session_day=None, session_end=None)
+
+
+def milestone(closes):
+    history = made_up(closes)
+    quote = quote_for(history, FRIDAY)
+    return mark_milestones(quote, extremes(history, FRIDAY))
+
+
+def test_a_close_above_every_earlier_one_is_a_record():
+    assert milestone([10, 50, 20, 51]).record_high
+    assert not milestone([10, 50, 20, 49]).record_high
+    assert not milestone([10, 50, 20, 50]).record_high  # equalling isn't beating
+
+
+def test_lowest_close_in_a_year():
+    old = [5.0] + [20.0] * 400  # a low of 5, but more than a year ago
+    assert milestone(old + [10.0]).low_52w
+    assert not milestone(old + [25.0]).low_52w
+
+
+def test_too_young_for_a_52_week_low():
+    assert not milestone([20.0] * 100 + [10.0]).low_52w
+
+
+def test_thursday_was_a_record_for_apple_in_the_saved_month():
+    history = parse_chart(payload("aapl_1mo.json"), "AAPL")
+    thursday = quote_for(history, THURSDAY)
+    assert mark_milestones(thursday, extremes(history, THURSDAY)).record_high
+    friday = quote_for(history, FRIDAY)
+    assert not mark_milestones(friday, extremes(history, FRIDAY)).record_high

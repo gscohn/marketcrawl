@@ -67,8 +67,11 @@ Every minute, `Scheduler.tick(now)`:
    clock, so the same input always gives the same output, which makes it
    easy to test.
    - marketcrawl: `market_formatter.py`. It picks the emoji too: 📈/📉 for
-     an ordinary day, 🚀/💥 for a big one (5%+, or 2%+ for an index), and 🔊
-     when twice the usual number of shares changed hands.
+     an ordinary day, 🚀/💥 for a big one (5%+, or 2%+ for an index), 🎩
+     for a record close, 🕳️ for the lowest close in a year, and 🔊 when
+     twice the usual number of shares changed hands. Records need every
+     close since the stock began, so that long history is downloaded about
+     once a day per symbol.
 4. **Send, then write it down.** After each send, the database records "sent
    today", one message at a time. If the program crashes halfway, it picks up
    where it left off instead of sending everyone a second copy.

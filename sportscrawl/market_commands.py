@@ -77,7 +77,7 @@ help - this list
 
 Indexes: sp500, dow, nasdaq
 
-\N{CHART WITH UPWARDS TREND} up  \N{CHART WITH DOWNWARDS TREND} down  \N{ROCKET}/\N{COLLISION SYMBOL} big day (5%+, or 2%+ for an index)  \N{SPEAKER WITH THREE SOUND WAVES} twice the usual trading volume
+\N{CHART WITH UPWARDS TREND} up  \N{CHART WITH DOWNWARDS TREND} down  \N{ROCKET}/\N{COLLISION SYMBOL} big day (5%+, or 2%+ for an index)  \N{TOP HAT} all-time high  \N{HOLE}\N{VARIATION SELECTOR-16} 52-week low  \N{SPEAKER WITH THREE SOUND WAVES} twice the usual volume
 
 A spin-off of SportsCrawl (@sportscrawl.app) by cruftbox."""
 
