@@ -14,7 +14,8 @@ this terminal", so you can watch it work without a Bluesky account.
                                      pretend it's that moment (for testing)
 
 The daily public post (see market_feed.py) is switched on with
-`python feed.py enable` and is a DRY RUN: printed, never posted.
+`python feed.py enable`. It's a DRY RUN (printed, not posted) unless
+--post is given, which publishes it on the bot's Bluesky profile.
 
 Filings from the SEC are included when SEC_CONTACT is set (the SEC requires
 an email address in every request; see edgar_source.py).
@@ -37,7 +38,8 @@ from sportscrawl.config import load_env_file, require, settings
 from sportscrawl.db import open_database
 from sportscrawl.edgar_source import EdgarSource
 from sportscrawl.logs import configure
-from sportscrawl.market_feed import FeedRouter, format_for
+from sportscrawl.market_feed import FeedRouter, dry_run_poster, format_for
+from sportscrawl.market_post import BlueskyPoster, PostClient
 from sportscrawl.market_repo import ticker_leagues
 from sportscrawl.market_schedule import classify_market
 from sportscrawl.market_source import MarketSource, YahooSource
@@ -60,7 +62,8 @@ def default_source() -> MarketSource:
                         movers=True)
 
 
-def build(database_path: str, pepper: str, sender=None, source=None) -> Scheduler:
+def build(database_path: str, pepper: str, sender=None, source=None,
+          poster=dry_run_poster) -> Scheduler:
     return Scheduler(
         connection=open_database(database_path),
         source=source or default_source(),
@@ -68,9 +71,9 @@ def build(database_path: str, pepper: str, sender=None, source=None) -> Schedule
         # people follow right now, so it's looked up fresh every tick.
         leagues=ticker_leagues,
         pepper=pepper,
-        # The public feed's post goes to the poster (a dry run for now:
-        # printed, not posted); everyone else's message goes to `sender`.
-        sender=FeedRouter(sender or stdout_sender),
+        # The public feed's post goes to the poster (printed, unless
+        # --post); everyone else's message goes to `sender`.
+        sender=FeedRouter(sender or stdout_sender, poster),
         formatter=format_for,
         classifier=classify_market,
     )
@@ -83,6 +86,8 @@ def main(argv=None) -> int:
                         default=os.environ.get("DATABASE_PATH", DEFAULT_DATABASE))
     parser.add_argument("--send", action="store_true",
                         help="send real Bluesky DMs instead of printing")
+    parser.add_argument("--post", action="store_true",
+                        help="publish the daily public post instead of printing it")
     parser.add_argument("--only", action="append", metavar="DID",
                         help="with --send: refuse to message anyone else (repeatable)")
     parser.add_argument("--at", metavar="ISO_TIME",
@@ -112,7 +117,12 @@ def main(argv=None) -> int:
             # can only message the people named here.
             sender = AllowlistSender(sender, args.only)
 
-    scheduler = build(args.database, pepper, sender=sender)
+    poster = dry_run_poster
+    if args.post:
+        require(config, "BSKY_IDENTIFIER", "BSKY_APP_PASSWORD")
+        poster = BlueskyPoster(PostClient(config["BSKY_IDENTIFIER"], config["BSKY_APP_PASSWORD"]))
+
+    scheduler = build(args.database, pepper, sender=sender, poster=poster)
     while True:
         now = (datetime.fromisoformat(args.at.replace("Z", "+00:00")) if args.at
                else datetime.now(timezone.utc))

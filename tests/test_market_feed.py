@@ -74,9 +74,9 @@ def test_the_whole_post():
         "\N{CHART WITH DOWNWARDS TREND} Dow -1.09%\n"
         "\n"
         "Biggest swings in company value\n"
-        "\N{CHART WITH DOWNWARDS TREND} NVDA -4.2% (-$218B)\n"
-        "\N{COLLISION SYMBOL} INTC -28.6% (-$140B)\n"
-        "\N{COLLISION SYMBOL} TSM -5.9% (-$133B)\n"
+        "\N{CHART WITH DOWNWARDS TREND} $NVDA -4.2% (-$218B)\n"
+        "\N{COLLISION SYMBOL} $INTC -28.6% (-$140B)\n"
+        "\N{COLLISION SYMBOL} $TSM -5.9% (-$133B)\n"
         "\n" + CALL_TO_ACTION
     )
     assert len(text) <= POST_LIMIT

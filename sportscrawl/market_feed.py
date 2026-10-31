@@ -7,15 +7,16 @@ day, a few minutes after the close, for anyone scrolling past:
     📉 S&P 500 -1.82%  💥 Nasdaq -2.86%  📉 Dow -1.09%
 
     Biggest swings in company value
-    📉 NVDA -4.2% (-$209B)
-    💥 TSM -5.9% (-$125B)
-    💥 SPCX -6.4% (-$117B)
+    📉 $NVDA -4.2% (-$209B)
+    💥 $TSM -5.9% (-$125B)
+    💥 $SPCX -6.4% (-$117B)
 
-    DM me "help" for your own stocks
+    DM me to get private stock updates daily
 
 Short on purpose: a glance in a feed, not a report. The movers are ranked
 by dollars of company value moved, not by percentage, so Nvidia falling 4%
-outranks an obscure company doubling.
+outranks an obscure company doubling. Symbols are written as cashtags
+($NVDA), so the post turns up when people search Bluesky for that stock.
 
 The trick that keeps this small: the public feed is treated as one more
 subscriber. It "follows" the three indexes plus a special `feed` marker, and
@@ -28,6 +29,7 @@ Public posts are, well, public, so two extra rules:
   - never post an apology ("prices unavailable"). If there's nothing to
     say, say nothing.
   - DRY RUN until switched on: posts are printed, not published.
+    `run_market.py --post` publishes them (market_post.py).
 """
 
 from __future__ import annotations
@@ -36,6 +38,7 @@ from . import market_repo, repo
 from .formatter import _header
 from .market_formatter import BIG_DOWN, BIG_MOVE_STOCK, BIG_UP, DOWN, UP, _arrow, format_market_digest
 from .models import Digest, Sub
+from .market_post import cashtag
 from .nyse_calendar import new_york_date
 from .yahoo import Mover, Quote, league_for
 
@@ -52,7 +55,7 @@ TOP_MOVERS = 3
 # Bluesky's limit for a post (it counts characters as people see them, so
 # counting code points, which is what len() does, is on the safe side).
 POST_LIMIT = 300
-CALL_TO_ACTION = 'DM me "help" for your own stocks'
+CALL_TO_ACTION = "DM me to get private stock updates daily"
 
 
 # -- switching it on and off -----------------------------------------------
@@ -98,7 +101,7 @@ def _mover_line(mover: Mover) -> str:
         arrow = BIG_DOWN
     else:
         arrow = UP if mover.pct > 0 else DOWN
-    return "%s %s %s%% (%s)" % (arrow, mover.symbol, "{:+.1f}".format(mover.pct),
+    return "%s %s %s%% (%s)" % (arrow, cashtag(mover.symbol), "{:+.1f}".format(mover.pct),
                                 _dollars(mover.value_change))
 
 
