@@ -1,4 +1,4 @@
-# The "front desk": checks the bot's Bluesky DMs every 20 seconds and
+# The "front desk": checks the bot's Bluesky DMs every 5 seconds and
 # answers commands (add, remove, list, test...). Installed by
 # setup_market_server.sh.
 [Unit]

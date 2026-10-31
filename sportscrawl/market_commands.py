@@ -112,7 +112,7 @@ If you like scores as much as stocks, follow @sportscrawl.app.
 Prices: Yahoo Finance. Filings: SEC EDGAR.
 Source: https://github.com/gscohn/marketcrawl"""
 
-ADDED_OUTRO = "You'll get closing prices after each market close. Send test to see one now."
+ADDED_OUTRO = "You'll get closing prices after each market close. Send 'test' to see one now."
 
 # A repeat unknown message inside the hour gets this instead of the full
 # help. The original project's reason, kept: a full reply to every message

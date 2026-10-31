@@ -1,6 +1,6 @@
 """Run the market bot's DM inbox.
 
-ELI5: this is the "front desk" process. Every 20 seconds it checks the bot's
+ELI5: this is the "front desk" process. Every 5 seconds it checks the bot's
 Bluesky DMs, works out what each new message asks for (`add AAPL`, `list`,
 `help`...), does it, and replies.
 
@@ -33,7 +33,10 @@ from sportscrawl.watchdog import Liveness
 
 from run_market import DEFAULT_DATABASE
 
-POLL_SECONDS = 20
+# How often to check for new DMs. The original checks every 20 seconds,
+# which felt slow (a reply could take 20 seconds to start). Each check is one
+# small request to Bluesky, so every 5 seconds is still far inside its limits.
+POLL_SECONDS = 5
 
 
 def main(argv=None) -> int:
