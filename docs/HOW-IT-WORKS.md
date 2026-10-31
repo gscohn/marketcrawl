@@ -95,9 +95,13 @@ of it:
 
 ### The public post
 
-Once a day the bot also writes a public post: the S&P 500, Nasdaq and Dow,
-plus the market's three biggest risers and fallers (from Yahoo's "day
-gainers / losers" lists), and an invitation to DM it. It's built as one more
+Once a day the bot also writes a short public post: how the S&P 500, Nasdaq
+and Dow did, the three biggest swings in company value, and an invitation to
+DM it. "Biggest swing" means the most dollars of company value gained or
+lost (market value × % change), not the biggest percentage: Amazon moving 2%
+is worth more attention than a tiny company doubling. Candidates come from
+Yahoo's lists of the 100 largest companies and the day's top gainers and
+losers. It's built as one more
 subscriber, a pretend one called the feed (`market_feed.py`), so it gets the
 mail room's once-a-day and retry rules for free. Only the writing (300
 characters max, never an apology in public) and the delivery (a post, not a

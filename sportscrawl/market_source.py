@@ -20,7 +20,7 @@ from .http import FetchError, Fetcher
 from .market_schedule import filing_window
 from .nyse_calendar import new_york_date
 from .source import LeagueHealth, WindowResult
-from .yahoo import (GAINERS, LOSERS, ParseError, chart_url, extremes, full_history_url,
+from .yahoo import (SCREENS, ParseError, chart_url, extremes, full_history_url,
                     latest_quote, mark_milestones, parse_chart, parse_screener, quote_for,
                     screener_url, symbol_of)
 
@@ -67,15 +67,15 @@ class YahooSource:
         return history
 
     def movers(self, now: datetime) -> list:
-        """The day's biggest gainers and losers, for the public post.
-        Cached like a chart. Never raises: no movers is a shorter post, not
-        a missing one."""
+        """Today's moves for the biggest companies and the biggest movers,
+        for the public post. Cached like a chart. Never raises: no movers is
+        a shorter post, not a missing one."""
         found = []
-        for list_id in (GAINERS, LOSERS):
+        for list_id, count in SCREENS:
             cached = self._charts.get(list_id)
             if cached is None or now - cached.fetched_at >= self._ttl:
                 try:
-                    movers = parse_screener(self._fetcher.get_json(screener_url(list_id)))
+                    movers = parse_screener(self._fetcher.get_json(screener_url(list_id, count)))
                 except (FetchError, ParseError):
                     movers = []
                 cached = _CacheEntry(fetched_at=now, history=movers)
@@ -195,15 +195,15 @@ class MarketSource:
         return self._prices.latest(symbols, now)
 
     def movers(self, now: datetime) -> list:
-        """The day's biggest gainers and losers, for the public post.
-        Cached like a chart. Never raises: no movers is a shorter post, not
-        a missing one."""
+        """Today's moves for the biggest companies and the biggest movers,
+        for the public post. Cached like a chart. Never raises: no movers is
+        a shorter post, not a missing one."""
         found = []
-        for list_id in (GAINERS, LOSERS):
+        for list_id, count in SCREENS:
             cached = self._charts.get(list_id)
             if cached is None or now - cached.fetched_at >= self._ttl:
                 try:
-                    movers = parse_screener(self._fetcher.get_json(screener_url(list_id)))
+                    movers = parse_screener(self._fetcher.get_json(screener_url(list_id, count)))
                 except (FetchError, ParseError):
                     movers = []
                 cached = _CacheEntry(fetched_at=now, history=movers)

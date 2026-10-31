@@ -23,8 +23,9 @@ trading volume.
 DM it `add AAPL`, `remove AAPL`, `list`, `about` or `help`. It sends nothing
 on weekends and market holidays.
 
-It also writes one public post per trading day: the three big indexes and
-the market's biggest movers. (For now that's a dry run, printed rather than
+It also writes one short public post per trading day: the three big indexes
+and the three biggest swings in company value (so Nvidia falling 4%, about
+$200 billion, outranks a small company doubling). (For now that's a dry run, printed rather than
 posted; `python feed.py preview` shows today's.)
 
 ## Built on SportsCrawl

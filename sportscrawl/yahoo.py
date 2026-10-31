@@ -269,38 +269,54 @@ def _average_volume(bars) -> float | None:
 # -- the market's biggest movers -------------------------------------------
 
 SCREENER_API = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
-GAINERS = "day_gainers"
-LOSERS = "day_losers"
+# Yahoo's ready-made lists, and how many of each to ask for. The biggest
+# 100 companies catch "Nvidia fell 4%"; the day's top percentage gainers and
+# losers catch a mid-sized company having an enormous day.
+SCREENS = (("largest_market_cap", 100), ("day_gainers", 25), ("day_losers", 25))
 
 
 @dataclass(frozen=True)
 class Mover:
-    """One of the day's biggest risers or fallers across the US market."""
+    """A company's move today, and what it was worth in dollars."""
 
     symbol: str
     name: str
     pct: float
+    market_cap: float  # the whole company's value, in dollars
     day: date  # the trading day this move happened on
 
+    @property
+    def value_change(self) -> float:
+        """Dollars of company value gained or lost today.
 
-def screener_url(list_id: str, count: int = 6) -> str:
-    """Yahoo's ready-made "biggest gainers / losers today" lists. They cover
-    US companies worth roughly $2 billion or more, so penny stocks that
-    double on nothing don't crowd out real news."""
+        ELI5: this is what makes a move "big". Amazon moving 2% is about
+        $50 billion; a tiny company doubling might be $50 million. Ranking
+        by percentage alone would put the tiny company first.
+        """
+        # The cap is today's (after the move), so undo the move to get
+        # yesterday's value, then take the percentage of that.
+        before = self.market_cap / (1 + self.pct / 100)
+        return before * self.pct / 100
+
+
+def screener_url(list_id: str, count: int) -> str:
     return "%s?scrIds=%s&count=%d" % (SCREENER_API, list_id, count)
 
 
 def parse_screener(payload: dict) -> list:
-    """One of those lists -> Movers, biggest move first. Raises ParseError."""
+    """One of those lists -> Movers. Raises ParseError."""
     try:
         result = payload["finance"]["result"][0]
         movers = []
         for row in result["quotes"]:
+            if not row.get("marketCap"):
+                continue  # funds and oddities with no company value
             zone = ZoneInfo(row.get("exchangeTimezoneName") or "America/New_York")
             movers.append(Mover(
                 symbol=row["symbol"],
-                name=row.get("shortName") or row["symbol"],
+                name=row.get("longName") or row.get("shortName") or row["symbol"],
                 pct=float(row["regularMarketChangePercent"]),
+                market_cap=float(row["marketCap"]),
                 day=_utc(row["regularMarketTime"]).astimezone(zone).date(),
             ))
         return movers

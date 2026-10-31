@@ -1,0 +1,908 @@
+{
+"finance": {
+"result": [
+{
+"id": "e6e3b1e2-65bc-48a1-8274-a06676f3f969",
+"title": "Largest Market Cap",
+"quotes": [
+{
+"symbol": "AAPL",
+"shortName": "Apple Inc.",
+"longName": "Apple Inc.",
+"regularMarketChangePercent": -1.22668,
+"regularMarketTime": 1793390401,
+"marketCap": 5029592301568,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "NVDA",
+"shortName": "NVIDIA Corporation",
+"longName": "NVIDIA Corporation",
+"regularMarketChangePercent": -4.22166,
+"regularMarketTime": 1793390401,
+"marketCap": 4941441662976,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "MSFT",
+"shortName": "Microsoft Corporation",
+"longName": "Microsoft Corporation",
+"regularMarketChangePercent": -1.55243,
+"regularMarketTime": 1793390401,
+"marketCap": 3875804807168,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "GOOGL",
+"shortName": "Alphabet Inc.",
+"longName": "Alphabet Inc.",
+"regularMarketChangePercent": -1.4023,
+"regularMarketTime": 1793390401,
+"marketCap": 3440352690176,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "GOOG",
+"shortName": "Alphabet Inc.",
+"longName": "Alphabet Inc.",
+"regularMarketChangePercent": -1.45225,
+"regularMarketTime": 1793390401,
+"marketCap": 3420436561920,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "AMZN",
+"shortName": "Amazon.com, Inc.",
+"longName": "Amazon.com, Inc.",
+"regularMarketChangePercent": -1.41105,
+"regularMarketTime": 1793390401,
+"marketCap": 2598423756800,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "TSM",
+"shortName": "Taiwan Semiconductor Manufactur",
+"longName": "Taiwan Semiconductor Manufacturing Company Limited",
+"regularMarketChangePercent": -5.94706,
+"regularMarketTime": 1793390402,
+"marketCap": 2106382745600,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "SPCX",
+"shortName": "Space Exploration Technologies ",
+"longName": "Space Exploration Technologies Corp.",
+"regularMarketChangePercent": -6.37292,
+"regularMarketTime": 1793390400,
+"marketCap": 1829640994816,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "TSLA",
+"shortName": "Tesla, Inc.",
+"longName": "Tesla, Inc.",
+"regularMarketChangePercent": -0.865358,
+"regularMarketTime": 1793390400,
+"marketCap": 1580341002240,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "META",
+"shortName": "Meta Platforms, Inc.",
+"longName": "Meta Platforms, Inc.",
+"regularMarketChangePercent": -1.52598,
+"regularMarketTime": 1793390401,
+"marketCap": 1572426743808,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "AVGO",
+"shortName": "Broadcom Inc.",
+"longName": "Broadcom Inc.",
+"regularMarketChangePercent": -5.48406,
+"regularMarketTime": 1793390401,
+"marketCap": 1556585250816,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "LLY",
+"shortName": "Eli Lilly and Company",
+"longName": "Eli Lilly and Company",
+"regularMarketChangePercent": 3.19139,
+"regularMarketTime": 1793390554,
+"marketCap": 1262666776576,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "BRK-A",
+"shortName": "Berkshire Hathaway Inc.",
+"longName": "Berkshire Hathaway Inc.",
+"regularMarketChangePercent": -0.232416,
+"regularMarketTime": 1793390459,
+"marketCap": 1163975327744,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "BRK-B",
+"shortName": "Berkshire Hathaway Inc. New",
+"longName": "Berkshire Hathaway Inc.",
+"regularMarketChangePercent": 0.0977873,
+"regularMarketTime": 1793390441,
+"marketCap": 1161313648640,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "SKHY",
+"shortName": "SK hynix Inc.",
+"longName": "SK hynix Inc.",
+"regularMarketChangePercent": -7.9462,
+"regularMarketTime": 1793390401,
+"marketCap": 1052189130752,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "MU",
+"shortName": "Micron Technology, Inc.",
+"longName": "Micron Technology, Inc.",
+"regularMarketChangePercent": -5.30147,
+"regularMarketTime": 1793390401,
+"marketCap": 1001015410688,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "WMT",
+"shortName": "Walmart Inc.",
+"longName": "Walmart Inc.",
+"regularMarketChangePercent": 1.86392,
+"regularMarketTime": 1793390401,
+"marketCap": 979897024512,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "JPM",
+"shortName": "JP Morgan Chase & Co.",
+"longName": "JPMorgan Chase & Co.",
+"regularMarketChangePercent": -1.90348,
+"regularMarketTime": 1793390402,
+"marketCap": 895043502080,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "AMD",
+"shortName": "Advanced Micro Devices, Inc.",
+"longName": "Advanced Micro Devices, Inc.",
+"regularMarketChangePercent": -10.8789,
+"regularMarketTime": 1793390401,
+"marketCap": 824073388032,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "V",
+"shortName": "Visa Inc.",
+"longName": "Visa Inc.",
+"regularMarketChangePercent": 0.742921,
+"regularMarketTime": 1793390402,
+"marketCap": 773002166272,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "XOM",
+"shortName": "ExxonMobil Holdings Corporation",
+"longName": "ExxonMobil Holdings Corporation",
+"regularMarketChangePercent": 2.16051,
+"regularMarketTime": 1793390510,
+"marketCap": 769955528704,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "JNJ",
+"shortName": "Johnson & Johnson",
+"longName": "Johnson & Johnson",
+"regularMarketChangePercent": -0.726744,
+"regularMarketTime": 1793390402,
+"marketCap": 657677221888,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "ASMLF",
+"shortName": "ASML Holding N.V.",
+"longName": "ASML Holding N.V.",
+"regularMarketChangePercent": -6.1196327,
+"regularMarketTime": 1793390400,
+"marketCap": 606458675200,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "ASML",
+"shortName": "ASML Holding N.V. - New York Re",
+"longName": "ASML Holding N.V.",
+"regularMarketChangePercent": -6.55248,
+"regularMarketTime": 1793390401,
+"marketCap": 603525611520,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "MA",
+"shortName": "Mastercard Incorporated",
+"longName": "Mastercard Incorporated",
+"regularMarketChangePercent": 0.363379,
+"regularMarketTime": 1793390402,
+"marketCap": 555819073536,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "ABBV",
+"shortName": "AbbVie Inc.",
+"longName": "AbbVie Inc.",
+"regularMarketChangePercent": 1.40995,
+"regularMarketTime": 1793390549,
+"marketCap": 521105244160,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "IDCBY",
+"shortName": "Industrial and Commercial Bank ",
+"longName": "Industrial and Commercial Bank of China Limited",
+"regularMarketChangePercent": 3.1376464,
+"regularMarketTime": 1793390400,
+"marketCap": 474471366656,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "IDCBF",
+"shortName": "Industrial and Commercial Bank ",
+"longName": "Industrial and Commercial Bank of China Limited",
+"regularMarketChangePercent": 0.0,
+"regularMarketTime": 1793390400,
+"marketCap": 466347982848,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "CVX",
+"shortName": "Chevron Corporation",
+"longName": "Chevron Corporation",
+"regularMarketChangePercent": 1.75408,
+"regularMarketTime": 1793390544,
+"marketCap": 461996818432,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "COST",
+"shortName": "Costco Wholesale Corporation",
+"longName": "Costco Wholesale Corporation",
+"regularMarketChangePercent": 1.77658,
+"regularMarketTime": 1793390401,
+"marketCap": 448570982400,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "PLTR",
+"shortName": "Palantir Technologies Inc.",
+"longName": "Palantir Technologies Inc.",
+"regularMarketChangePercent": -6.26718,
+"regularMarketTime": 1793390400,
+"marketCap": 442427080704,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "TCEHY",
+"shortName": "Tencent Holding Ltd.",
+"longName": "Tencent Holdings Limited",
+"regularMarketChangePercent": 0.82237154,
+"regularMarketTime": 1793390400,
+"marketCap": 441585958912,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "TCTZF",
+"shortName": "Tencent Holding Ltd.",
+"longName": "Tencent Holdings Limited",
+"regularMarketChangePercent": -2.2087135,
+"regularMarketTime": 1793390400,
+"marketCap": 434562334720,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "SSNLF",
+"shortName": "SAMSUNG ELECTRONICS CO",
+"longName": "Samsung Electronics Co., Ltd.",
+"regularMarketChangePercent": 0.0,
+"regularMarketTime": 1793304000,
+"marketCap": 424642478080,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "CSCO",
+"shortName": "Cisco Systems, Inc.",
+"longName": "Cisco Systems, Inc.",
+"regularMarketChangePercent": -3.75725,
+"regularMarketTime": 1793390401,
+"marketCap": 412039774208,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "KO",
+"shortName": "Coca-Cola Company (The)",
+"longName": "The Coca-Cola Company",
+"regularMarketChangePercent": 1.35747,
+"regularMarketTime": 1793390402,
+"marketCap": 404722974720,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "RHHBF",
+"shortName": "Roche Holding Ltd",
+"longName": "Roche Holding AG",
+"regularMarketChangePercent": 2.253063,
+"regularMarketTime": 1793390400,
+"marketCap": 399211593728,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "ORCL",
+"shortName": "Oracle Corporation",
+"longName": "Oracle Corporation",
+"regularMarketChangePercent": -6.37002,
+"regularMarketTime": 1793390622,
+"marketCap": 396126224384,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "RHHBY",
+"shortName": "Roche Holding Ltd",
+"longName": "Roche Holding AG",
+"regularMarketChangePercent": 0.8227744,
+"regularMarketTime": 1793390400,
+"marketCap": 390542786560,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "RHHVF",
+"shortName": "Roche Holding Ltd",
+"longName": "Roche Holding AG",
+"regularMarketChangePercent": -0.3426723,
+"regularMarketTime": 1793390400,
+"marketCap": 386973237248,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "PG",
+"shortName": "Procter & Gamble Company (The)",
+"longName": "The Procter & Gamble Company",
+"regularMarketChangePercent": 0.610257,
+"regularMarketTime": 1793390526,
+"marketCap": 374484238336,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "MRK",
+"shortName": "Merck & Company, Inc.",
+"longName": "Merck & Co., Inc.",
+"regularMarketChangePercent": 2.18001,
+"regularMarketTime": 1793390528,
+"marketCap": 368891494400,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "UNH",
+"shortName": "UnitedHealth Group Incorporated",
+"longName": "UnitedHealth Group Incorporated",
+"regularMarketChangePercent": -0.958848,
+"regularMarketTime": 1793390403,
+"marketCap": 365294157824,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "INTC",
+"shortName": "Intel Corporation",
+"longName": "Intel Corporation",
+"regularMarketChangePercent": -28.5761,
+"regularMarketTime": 1793390401,
+"marketCap": 349185605632,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "BAC",
+"shortName": "Bank of America Corporation",
+"longName": "Bank of America Corporation",
+"regularMarketChangePercent": -2.20962,
+"regularMarketTime": 1793390402,
+"marketCap": 346203979776,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "CICHY",
+"shortName": "China Construction Bank Corp.",
+"longName": "China Construction Bank Corporation",
+"regularMarketChangePercent": 0.7381528,
+"regularMarketTime": 1793390400,
+"marketCap": 339164889088,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "PCCYF",
+"shortName": "PetroChina Co., Ltd.",
+"longName": "PetroChina Company Limited",
+"regularMarketChangePercent": 2.272725,
+"regularMarketTime": 1793390400,
+"marketCap": 332594642944,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "CICHF",
+"shortName": "China Construction Bank Corp.",
+"longName": "China Construction Bank Corporation",
+"regularMarketChangePercent": 9.565219,
+"regularMarketTime": 1793390400,
+"marketCap": 329616490496,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "HD",
+"shortName": "Home Depot, Inc. (The)",
+"longName": "The Home Depot, Inc.",
+"regularMarketChangePercent": 0.0668737,
+"regularMarketTime": 1793390402,
+"marketCap": 328439431168,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "PM",
+"shortName": "Philip Morris International Inc",
+"longName": "Philip Morris International Inc.",
+"regularMarketChangePercent": 0.139086,
+"regularMarketTime": 1793390403,
+"marketCap": 325422874624,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "ACGBF",
+"shortName": "AGRICULTURAL BANK OF CHINA",
+"longName": "Agricultural Bank of China Limited",
+"regularMarketChangePercent": 13.924045,
+"regularMarketTime": 1793390400,
+"marketCap": 314984726528,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "GE",
+"shortName": "GE Aerospace",
+"longName": "GE Aerospace",
+"regularMarketChangePercent": -3.59368,
+"regularMarketTime": 1793390403,
+"marketCap": 313136349184,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "ACGBY",
+"shortName": "Agricultural Bank of China",
+"longName": "Agricultural Bank of China Limited",
+"regularMarketChangePercent": 1.4135863,
+"regularMarketTime": 1793390400,
+"marketCap": 311344889856,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "AMAT",
+"shortName": "Applied Materials, Inc.",
+"longName": "Applied Materials, Inc.",
+"regularMarketChangePercent": -7.48708,
+"regularMarketTime": 1793390401,
+"marketCap": 309574434816,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "SHEL",
+"shortName": "Shell PLC",
+"longName": "Shell plc",
+"regularMarketChangePercent": 0.947343,
+"regularMarketTime": 1793390403,
+"marketCap": 307277594624,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "NVS",
+"shortName": "Novartis AG",
+"longName": "Novartis AG",
+"regularMarketChangePercent": -0.192435,
+"regularMarketTime": 1793390402,
+"marketCap": 303671771136,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "NVSEF",
+"shortName": "Novartis AG",
+"longName": "Novartis AG",
+"regularMarketChangePercent": 0.0,
+"regularMarketTime": 1793390400,
+"marketCap": 302840807424,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "JPM-PC",
+"shortName": "J P Morgan Chase & Co Depositar",
+"longName": "JPMorgan Chase & Co.",
+"regularMarketChangePercent": 0.523099,
+"regularMarketTime": 1793390402,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "RYDAF",
+"shortName": "SHELL PLC",
+"longName": "Shell plc",
+"regularMarketChangePercent": -0.33815575,
+"regularMarketTime": 1793390400,
+"marketCap": 299955388416,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "PANW",
+"shortName": "Palo Alto Networks, Inc.",
+"longName": "Palo Alto Networks, Inc.",
+"regularMarketChangePercent": -3.86263,
+"regularMarketTime": 1793390401,
+"marketCap": 299443781632,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "LRCX",
+"shortName": "Lam Research Corporation",
+"longName": "Lam Research Corporation",
+"regularMarketChangePercent": -6.00653,
+"regularMarketTime": 1793390401,
+"marketCap": 299228069888,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "HSBC",
+"shortName": "HSBC Holdings, plc.",
+"longName": "HSBC Holdings plc",
+"regularMarketChangePercent": -1.36259,
+"regularMarketTime": 1793390402,
+"marketCap": 292127834112,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "HBCYF",
+"shortName": "HSBC Holdings Plc",
+"longName": "HSBC Holdings plc",
+"regularMarketChangePercent": 3.349569,
+"regularMarketTime": 1793390400,
+"marketCap": 290178498560,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "AZN",
+"shortName": "AstraZeneca PLC",
+"longName": "AstraZeneca PLC",
+"regularMarketChangePercent": 7.02408,
+"regularMarketTime": 1793390403,
+"marketCap": 289476542464,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "MS",
+"shortName": "Morgan Stanley",
+"longName": "Morgan Stanley",
+"regularMarketChangePercent": -2.40932,
+"regularMarketTime": 1793390532,
+"marketCap": 288429506560,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "JPM-PD",
+"shortName": "J P Morgan Chase & Co Depositar",
+"longName": "JPMorgan Chase & Co.",
+"regularMarketChangePercent": 0.0923382,
+"regularMarketTime": 1793390403,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "CAT",
+"shortName": "Caterpillar, Inc.",
+"longName": "Caterpillar Inc.",
+"regularMarketChangePercent": -3.80605,
+"regularMarketTime": 1793390402,
+"marketCap": 286262525952,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "RY",
+"shortName": "Royal Bank Of Canada",
+"longName": "Royal Bank of Canada",
+"regularMarketChangePercent": -1.48037,
+"regularMarketTime": 1793390402,
+"marketCap": 281011552256,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "TXN",
+"shortName": "Texas Instruments Incorporated",
+"longName": "Texas Instruments Incorporated",
+"regularMarketChangePercent": -3.39735,
+"regularMarketTime": 1793390400,
+"marketCap": 275042271232,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "SAPGF",
+"shortName": "SAP SE",
+"longName": "SAP SE",
+"regularMarketChangePercent": 0.48311454,
+"regularMarketTime": 1793390400,
+"marketCap": 271272640512,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "SAP",
+"shortName": "SAP  SE",
+"longName": "SAP SE",
+"regularMarketChangePercent": 0.40586,
+"regularMarketTime": 1793390402,
+"marketCap": 271261089792,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "DELL",
+"shortName": "Dell Technologies Inc.",
+"longName": "Dell Technologies Inc.",
+"regularMarketChangePercent": -10.7695,
+"regularMarketTime": 1793390620,
+"marketCap": 269775339520,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "RTX",
+"shortName": "RTX Corporation",
+"longName": "RTX Corporation",
+"regularMarketChangePercent": 0.200606,
+"regularMarketTime": 1793390402,
+"marketCap": 269618216960,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "CGXYY",
+"shortName": "China Galaxy Securities Co Ltd.",
+"longName": "China Galaxy Securities Co., Ltd.",
+"regularMarketChangePercent": 0.0,
+"regularMarketTime": 1793304000,
+"marketCap": 264940552192,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "NSRGY",
+"shortName": "Nestle S.A.",
+"longName": "Nestl\u00e9 S.A.",
+"regularMarketChangePercent": 2.266152,
+"regularMarketTime": 1793390400,
+"marketCap": 263498219520,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "QH",
+"shortName": "Quhuo Limited",
+"longName": "Quhuo Limited",
+"regularMarketChangePercent": -0.99999905,
+"regularMarketTime": 1793390400,
+"marketCap": 261444829184,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "GS",
+"shortName": "Goldman Sachs Group, Inc. (The)",
+"longName": "The Goldman Sachs Group, Inc.",
+"regularMarketChangePercent": -3.57647,
+"regularMarketTime": 1793390403,
+"marketCap": 260467359744,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "NSRGF",
+"shortName": "Nestle S.A.",
+"longName": "Nestl\u00e9 S.A.",
+"regularMarketChangePercent": -0.8278348,
+"regularMarketTime": 1793390400,
+"marketCap": 258842476544,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "LRLCY",
+"shortName": "L'Oreal Co.",
+"longName": "L'Or\u00e9al S.A.",
+"regularMarketChangePercent": 2.3201823,
+"regularMarketTime": 1793390400,
+"marketCap": 258711076864,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "NFLX",
+"shortName": "Netflix, Inc.",
+"longName": "Netflix, Inc.",
+"regularMarketChangePercent": 0.0483523,
+"regularMarketTime": 1793390400,
+"marketCap": 258497380352,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "TMO",
+"shortName": "Thermo Fisher Scientific Inc",
+"longName": "Thermo Fisher Scientific Inc.",
+"regularMarketChangePercent": -1.71748,
+"regularMarketTime": 1793390402,
+"marketCap": 257713864704,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "CRWD",
+"shortName": "CrowdStrike Holdings, Inc.",
+"longName": "CrowdStrike Holdings, Inc.",
+"regularMarketChangePercent": -4.10492,
+"regularMarketTime": 1793390401,
+"marketCap": 256424001536,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "LRLCF",
+"shortName": "L'Oreal Co.",
+"longName": "L'Or\u00e9al S.A.",
+"regularMarketChangePercent": -1.4137188,
+"regularMarketTime": 1793390400,
+"marketCap": 252897968128,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "BACHY",
+"shortName": "Bank of China, Ltd.",
+"longName": "Bank of China Limited",
+"regularMarketChangePercent": -0.051073693,
+"regularMarketTime": 1793390400,
+"marketCap": 252227862528,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "AMGN",
+"shortName": "Amgen Inc.",
+"longName": "Amgen Inc.",
+"regularMarketChangePercent": 1.14601,
+"regularMarketTime": 1793390400,
+"marketCap": 251939930112,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "WFC",
+"shortName": "Wells Fargo & Company",
+"longName": "Wells Fargo & Company",
+"regularMarketChangePercent": -1.66254,
+"regularMarketTime": 1793390603,
+"marketCap": 250354319360,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "BACHF",
+"shortName": "Bank of China, Ltd.",
+"longName": "Bank of China Limited",
+"regularMarketChangePercent": 0.0,
+"regularMarketTime": 1793390400,
+"marketCap": 248103534592,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "BABA",
+"shortName": "Alibaba Group Holding Limited",
+"longName": "Alibaba Group Holding Limited",
+"regularMarketChangePercent": -1.50693,
+"regularMarketTime": 1793390542,
+"marketCap": 243898531840,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "IBM",
+"shortName": "International Business Machines",
+"longName": "International Business Machines Corporation",
+"regularMarketChangePercent": -0.181974,
+"regularMarketTime": 1793390402,
+"marketCap": 243661602816,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "MUFG",
+"shortName": "Mitsubishi UFJ Financial Group,",
+"longName": "Mitsubishi UFJ Financial Group, Inc.",
+"regularMarketChangePercent": -1.732,
+"regularMarketTime": 1793390402,
+"marketCap": 242674286592,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "BABAF",
+"shortName": "Alibaba Group Holding Limited",
+"longName": "Alibaba Group Holding Limited",
+"regularMarketChangePercent": -2.7370949,
+"regularMarketTime": 1793390400,
+"marketCap": 241868521472,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "BML-PG",
+"shortName": "Bank of America Corporation Dep",
+"longName": "Bank of America Corporation",
+"regularMarketChangePercent": 0.280422,
+"regularMarketTime": 1793390121,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "BML-PH",
+"shortName": "Bank of America Corporation Dep",
+"longName": "Bank of America Corporation",
+"regularMarketChangePercent": 0.283844,
+"regularMarketTime": 1793390403,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "LIN",
+"shortName": "Linde plc",
+"longName": "Linde plc",
+"regularMarketChangePercent": 2.20411,
+"regularMarketTime": 1793390400,
+"marketCap": 236079235072,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "BML-PL",
+"shortName": "Bank of America Corporation Dep",
+"longName": "Bank of America Corporation",
+"regularMarketChangePercent": -0.331816,
+"regularMarketTime": 1793390402,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "TM",
+"shortName": "Toyota Motor Corporation",
+"longName": "Toyota Motor Corporation",
+"regularMarketChangePercent": -0.467883,
+"regularMarketTime": 1793390402,
+"marketCap": 230508544000,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "MBFJF",
+"shortName": "Mitsubishi UFJ Financial Group,",
+"longName": "Mitsubishi UFJ Financial Group, Inc.",
+"regularMarketChangePercent": -0.7320626,
+"regularMarketTime": 1793390400,
+"marketCap": 228942266368,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "GEV",
+"shortName": "GE Vernova Inc.",
+"longName": "GE Vernova Inc.",
+"regularMarketChangePercent": -3.37669,
+"regularMarketTime": 1793390402,
+"marketCap": 227058515968,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "SIEGY",
+"shortName": "Siemens AG",
+"longName": "Siemens Aktiengesellschaft",
+"regularMarketChangePercent": -3.5842295,
+"regularMarketTime": 1793390400,
+"marketCap": 226131148800,
+"exchangeTimezoneName": "America/New_York"
+},
+{
+"symbol": "TOYOF",
+"shortName": "Toyota Motor Corp.",
+"longName": "Toyota Motor Corporation",
+"regularMarketChangePercent": -4.112335,
+"regularMarketTime": 1793390400,
+"marketCap": 225196621824,
+"exchangeTimezoneName": "America/New_York"
+}
+]
+}
+],
+"error": null
+}
+}
