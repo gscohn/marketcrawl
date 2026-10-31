@@ -1,0 +1,143 @@
+# How it works, explained simply
+
+marketcrawl is a fork of [sportscrawl](https://github.com/cruftbox/sportscrawl),
+a Bluesky bot that DMs people the scores for the teams they follow once a day.
+marketcrawl keeps almost all of that machinery and changes three things:
+**what it fetches** (stock prices instead of scores), **when it sends** (after
+the stock market closes instead of at a time you pick), and **how you sign up**
+(DM commands instead of a web page).
+
+This page walks through the whole thing, original parts first.
+
+## The big picture
+
+Think of the bot as a small post office with two workers sharing one filing
+cabinet.
+
+```
+            ┌──────────────── the filing cabinet ────────────────┐
+            │  SQLite database: who follows what, who got what   │
+            └───────▲────────────────────────────────▲───────────┘
+                    │                                │
+   Worker 1: the mail room                Worker 2: the front desk
+   (scheduler: run_market.py)             (poller + commands)
+   every minute: is anyone's              every few seconds: any new
+   message due? if so, fetch              DMs? if so, work out what
+   prices, write it, send it              they want and reply
+                    │                                │
+                    ▼                                ▼
+              Yahoo Finance                    Bluesky DMs
+```
+
+- **The filing cabinet** is one SQLite file. SQLite is a whole database in a
+  single file: no server to run. The tables are created by the numbered
+  scripts in `migrations/`.
+- **The mail room** (`sportscrawl/scheduler.py`) wakes up every minute. For
+  each subscriber it asks: "is your message due?" If anyone's is, it fetches
+  the data once, writes each person's message, and sends them one by one.
+- **The front desk** (`sportscrawl/poller.py` + a command handler) checks the
+  bot's DMs, figures out what each message means (`add AAPL`, `stop`...), does
+  it, and replies.
+
+They're separate programs on purpose. The original author's reason: web
+servers often run several copies of themselves at once, and if the mail room
+lived inside one, every copy would send everyone's message, so people would
+get duplicates.
+
+## The mail room, step by step
+
+Every minute, `Scheduler.tick(now)`:
+
+1. **Who's due?** For each active subscriber, a "classify" function answers
+   *not due yet*, *due*, or *expired* (too late, skip today).
+   - sportscrawl: due at the time you picked, e.g. 7:00am your time.
+   - marketcrawl (`market_schedule.py`): due 15 minutes after the stock
+     market's closing bell, using `nyse_calendar.py` to know when that is
+     (4:00pm New York time, 1:00pm on short days, never on holidays).
+2. **Fetch once.** If anyone is due, ask the "source" for data, once for
+   everybody. A hundred people following AAPL cost one download, not a hundred.
+   - sportscrawl: `source.py` asks ESPN for scoreboards.
+   - marketcrawl: `market_source.py` asks Yahoo for price charts, and
+     `yahoo.py` turns Yahoo's JSON into tidy `Quote` objects.
+3. **Write each message.** A "formatter" turns the data plus one person's
+   follows into text. It's a *pure function*: no network, no database, no
+   clock, so the same input always gives the same output, which makes it
+   easy to test.
+   - marketcrawl: `market_formatter.py`.
+4. **Send, then write it down.** After each send, the database records "sent
+   today", one message at a time. If the program crashes halfway, it picks up
+   where it left off instead of sending everyone a second copy.
+
+### What happens when something breaks
+
+The original author thought hard about failure, and marketcrawl inherits all
+of it:
+
+- **Retries.** `http.py` tries each download up to three times, waiting a
+  little longer each time.
+- **Don't apologise too fast.** If some data is missing at send time, the
+  scheduler waits up to 10 minutes, retrying each minute, before sending
+  what it has with a "Some prices are missing." line.
+- **One bad send doesn't stop the others.** Each person's send is wrapped so
+  one failure is logged and everyone else still gets theirs.
+- **Too late is worse than never.** If the computer was off and the message
+  is more than 90 minutes late, it's skipped for the day.
+- **Nothing to say means saying nothing.** Weekends and holidays send no
+  message at all, not a "markets closed" note.
+
+## The front desk
+
+The poller reads new DMs and hands each one to a command handler, which
+returns the reply text. It never sends anything itself; the poller does that.
+Because the handler just returns text, every command can be tested without
+Bluesky.
+
+- sportscrawl's handler (`commands.py`) knows `stop`, `start`, `delete`,
+  `config` (which sends a link to a web settings page) and `privacy`.
+- marketcrawl's handler (`market_commands.py`) adds `add`, `remove`, `list`
+  and `help`, and passes everything else to the original.
+
+You don't need a password, because Bluesky already proves who sent each DM.
+The sender's ID is the only identity the bot uses.
+
+## How marketcrawl plugs in without rewriting the original
+
+The original scheduler was built so that its data source could be swapped.
+marketcrawl adds new files and gives the scheduler three optional settings:
+
+| setting | sportscrawl (default) | marketcrawl |
+|---|---|---|
+| `classifier` | your chosen send time | market close + 15 min |
+| `formatter` | scores message | prices message |
+| `leagues` | a fixed list of leagues | a function: "whatever symbols people follow right now" |
+
+One more trick: each stock symbol is stored as if it were its own tiny
+"league" (`market/AAPL`). So the original's per-league bookkeeping (which
+leagues failed, the health table, the admin counts) works for stocks without
+any changes.
+
+## Trying it on your own computer
+
+```
+python -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt flask
+echo "EVENTS_PEPPER=$(openssl rand -hex 16)" > .env
+
+.venv/bin/python -m pytest                     # run every test
+.venv/bin/python replay_market.py              # the last two weeks of closes, in seconds
+.venv/bin/python dev_dm.py "add AAPL sp500"    # pretend to DM the bot
+.venv/bin/python dev_dm.py "list"
+.venv/bin/python run_market.py --once          # one tick of the mail room
+```
+
+`run_market.py` prints messages to the terminal rather than sending DMs.
+
+## Known limits
+
+- **The calendar is typed in by hand** and covers 2026–2027. After that it
+  stops with a clear error until next year's NYSE dates are added to
+  `nyse_calendar.py`.
+- **Yahoo's chart API is unofficial.** Like ESPN's, it can change without
+  notice.
+- **Only US market hours.** A Toronto symbol like SHOP.TO works, but on a
+  Canadian holiday when New York is open it will show as missing.
+- **After-hours trading is ignored.** The price is the regular 4:00pm close.

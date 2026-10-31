@@ -63,13 +63,17 @@ def requests_transport(url: str, timeout, headers) -> Response:
 
 
 class Fetcher:
-    def __init__(self, transport=None, sleep=time.sleep):
+    def __init__(self, transport=None, sleep=time.sleep, user_agent=USER_AGENT):
         self._transport = transport or requests_transport
         self._sleep = sleep
+        # Optional so another data source can name itself differently. Yahoo
+        # is the mirror image of ESPN: it 429s python-requests and curl, and
+        # serves a plain product token. Defaults to ESPN's string.
+        self._user_agent = user_agent
 
     def get_json(self, url: str) -> dict:
         timeout = (CONNECT_TIMEOUT, READ_TIMEOUT)
-        headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+        headers = {"User-Agent": self._user_agent, "Accept": "application/json"}
         last_problem = "no attempt made"
 
         for attempt in range(MAX_ATTEMPTS):

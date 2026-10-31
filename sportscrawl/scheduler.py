@@ -122,10 +122,16 @@ class Scheduler:
         sleep=time.sleep,
         gap=SEND_GAP_SECONDS,
         alert_did=None,
+        formatter=format_digest,
+        classifier=classify,
     ):
         self._db = connection
         self._source = source
-        self._leagues = list(leagues)
+        # A list, or a callable taking the connection, re-read every tick for
+        # a source whose leagues come from what subscribers follow.
+        self._leagues = leagues if callable(leagues) else list(leagues)
+        self._format = formatter
+        self._classify = classifier
         self._pepper = pepper
         self._send = sender
         self._sleep = sleep
@@ -153,7 +159,7 @@ class Scheduler:
 
         due = []
         for row in rows:
-            verdict, candidate = classify(row, now)
+            verdict, candidate = self._classify(row, now)
             if verdict == EXPIRED:
                 # Past the window. A missing digest is a smaller failure than
                 # one arriving when it is no longer true.
@@ -165,7 +171,8 @@ class Scheduler:
         if not due:
             return
 
-        window = self._source.fetch_window(self._leagues, now)
+        leagues = self._leagues(self._db) if callable(self._leagues) else self._leagues
+        window = self._source.fetch_window(leagues, now)
         for health in self._source.health.values():
             repo.save_league_health(self._db, health)
 
@@ -266,7 +273,7 @@ class Scheduler:
             report.deferred += 1
             return
 
-        digest = format_digest(
+        digest = self._format(
             window.events,
             subs,
             row["tz"],
