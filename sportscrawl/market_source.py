@@ -219,44 +219,6 @@ class MarketSource:
     def latest(self, symbols, now: datetime) -> list:
         return self._prices.latest(symbols, now)
 
-    def movers(self, now: datetime) -> list:
-        """Today's moves for the biggest companies and the biggest movers,
-        for the public post. Cached like a chart. Never raises: no movers is
-        a shorter post, not a missing one."""
-        found = []
-        for list_id, count in SCREENS:
-            cached = self._charts.get(list_id)
-            if cached is None or now - cached.fetched_at >= self._ttl:
-                try:
-                    movers = parse_screener(self._fetcher.get_json(screener_url(list_id, count)))
-                except (FetchError, ParseError):
-                    movers = []
-                cached = _CacheEntry(fetched_at=now, history=movers)
-                self._charts[list_id] = cached
-            found.extend(cached.history)
-        return found
-
-    def milestones(self, quote, now: datetime):
-        """Mark a quote as a record high or 52-week low if it is one.
-
-        Nice to have, never essential: if the long history can't be had,
-        the quote goes out unmarked rather than late.
-        """
-        cached = self._long.get(quote.symbol)
-        if cached is None or now - cached.fetched_at >= self._long_ttl:
-            try:
-                payload = self._fetcher.get_json(full_history_url(quote.symbol))
-                history = parse_chart(payload, quote.symbol)
-            except (FetchError, ParseError):
-                # Remember the failure too (as None), so a missing history
-                # isn't re-downloaded every minute.
-                history = None
-            cached = _CacheEntry(fetched_at=now, history=history)
-            self._long[quote.symbol] = cached
-        if cached.history is None:
-            return quote
-        return mark_milestones(quote, extremes(cached.history, quote.close_date))
-
     def fetch_window(self, leagues, now: datetime) -> WindowResult:
         leagues = list(leagues)
         result = self._prices.fetch_window(leagues, now)
