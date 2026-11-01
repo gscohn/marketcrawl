@@ -53,12 +53,14 @@ def main(argv=None) -> int:
     db = open_database(args.database)
     client = ChatClient(config["BSKY_IDENTIFIER"], config["BSKY_APP_PASSWORD"])
     bot_did = client.login()
-    # `add` checks each symbol exists by asking Yahoo, and `test` replies
-    # with the latest close, so the handler gets both.
+    # `add` checks each symbol exists by asking Yahoo, `test` replies with
+    # the latest close and `quote` with the price now, so the handler gets
+    # all three.
     # One source for both, so the lookup's download is reused for the report.
     prices = YahooSource()
     handler = MarketCommandHandler(db, config["EVENTS_PEPPER"],
-                                   lookup=prices.lookup, latest=prices.latest)
+                                   lookup=prices.lookup, latest=prices.latest,
+                                   live=prices.live)
     poller = Poller(db, client, handler, bot_did=bot_did)
 
     live = Liveness("poller")

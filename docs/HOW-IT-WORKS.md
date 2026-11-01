@@ -118,13 +118,18 @@ Bluesky.
 - sportscrawl's handler (`commands.py`) knows `stop`, `start`, `delete`,
   `config` (which sends a link to a web settings page) and `privacy`.
 - marketcrawl's handler (`market_commands.py`) adds `add`, `remove`,
-  `list`, `test`, `about` and `help`, and passes everything else to the
-  original.
+  `list`, `test`, `quote`, `about` and `help`, and passes everything else
+  to the original.
 - `test` answers with the message for the latest close straight away,
   whatever the hour, so people can see what they signed up for. It doesn't
   count as that day's message. It's rationed: once per person every 10
   minutes, and 30 an hour for everyone together, because each one downloads
   prices.
+- `quote AAPL` (or `quote` alone, for everything you follow) answers with
+  the price right now, during market hours only. Also rationed: once a
+  minute per person, at most 5 symbols, and 600 symbols an hour for
+  everyone together. Prices are cached for 30 seconds, so many people
+  asking about the same stock cost one download.
 - `run_market_poller.py` is the original `run_poller.py` with the market
   handler plugged in. The Bluesky side (logging in, reading the inbox,
   replying) is the original's code, unchanged.

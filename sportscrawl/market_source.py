@@ -21,13 +21,17 @@ from .market_schedule import filing_window
 from .nyse_calendar import new_york_date
 from .source import LeagueHealth, WindowResult
 from .yahoo import (SCREENS, ParseError, chart_url, extremes, full_history_url,
-                    latest_quote, mark_milestones, parse_chart, parse_screener, quote_for,
-                    screener_url, symbol_of)
+                    latest_quote, live_quote, mark_milestones, parse_chart, parse_screener,
+                    quote_for, screener_url, symbol_of)
 
 # How long a download stays fresh. Short, because after the close the
 # scheduler retries every minute while a symbol is late, and each retry
 # should see new data.
 CHART_TTL = timedelta(minutes=2)
+# How old a price may be for the `quote` command. Short, so it's close to
+# live; still a cache, so 50 people asking about AAPL in the same half
+# minute cost one download, not 50.
+LIVE_TTL = timedelta(seconds=30)
 # The full history (for record highs and 52-week lows) is big and only
 # matters up to yesterday, so it's downloaded about once a day.
 LONG_TTL = timedelta(hours=12)
@@ -146,6 +150,23 @@ class YahooSource:
             if quote is not None:
                 quotes.append(self.milestones(quote, now))
         return quotes
+
+    def live(self, symbols, now: datetime) -> list:
+        """(quote, time of the last trade) for each symbol, for the `quote`
+        command. Symbols Yahoo doesn't know or can't give are left out."""
+        found = []
+        for symbol in symbols:
+            cached = self._charts.get(symbol)
+            if cached is not None and now - cached.fetched_at >= LIVE_TTL:
+                del self._charts[symbol]  # too old for a live price: refetch
+            try:
+                history = self.history(symbol, now)
+            except (FetchError, ParseError):
+                continue
+            quote = live_quote(history, new_york_date(now))
+            if quote is not None:
+                found.append((quote, history.market_time))
+        return found
 
     def lookup(self, symbol: str, now: datetime):
         """Does this symbol exist? For the `add` command.

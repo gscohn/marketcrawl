@@ -36,8 +36,8 @@ too-late cutoff, silence on holidays. Only two things differ, both here:
 Public posts are, well, public, so two extra rules:
   - never post an apology ("prices unavailable"). If there's nothing to
     say, say nothing.
-  - DRY RUN until switched on: posts are printed, not published.
-    `run_market.py --post` publishes them (market_post.py).
+  - DRY RUN unless switched on: `run_market.py --post` publishes the
+    post (market_post.py); without it, it's only printed.
 """
 
 from __future__ import annotations

@@ -54,6 +54,9 @@ class History:
     market_time: datetime
     session_day: date | None
     session_end: datetime | None
+    # The latest trade price. During market hours this is the live price;
+    # after the close it's the closing price.
+    price: float | None = None
 
 
 @dataclass(frozen=True)
@@ -202,6 +205,7 @@ def parse_chart(payload: dict, symbol: str) -> History:
             market_time=_utc(meta["regularMarketTime"]),
             session_day=session_end.astimezone(zone).date() if session_end else None,
             session_end=session_end,
+            price=float(meta["regularMarketPrice"]) if meta.get("regularMarketPrice") else None,
         )
     except (KeyError, IndexError, TypeError, ValueError) as exc:
         raise ParseError("malformed chart for %s: %s" % (symbol, exc)) from exc
@@ -243,6 +247,18 @@ def quote_for(history: History, day: date) -> Quote | None:
         volume=bar.volume,
         avg_volume=_average_volume(history.bars[max(0, index - VOLUME_LOOKBACK):index]),
     )
+
+
+def live_quote(history: History, day: date) -> Quote | None:
+    """The price right now, compared with the previous day's close, for the
+    `quote` command. Shaped like a Quote so it prints like one; `close` here
+    means "latest price", not a finished close. None if Yahoo gave no price
+    or there's no earlier day to compare with."""
+    earlier = [bar for bar in history.bars if bar.day < day]
+    if history.price is None or not earlier:
+        return None
+    return Quote(symbol=history.symbol, name=history.name, is_index=history.is_index,
+                 close=history.price, prev_close=earlier[-1].close, close_date=day)
 
 
 def latest_quote(history: History) -> Quote | None:

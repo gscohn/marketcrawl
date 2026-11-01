@@ -1,6 +1,7 @@
 # The "mail room": wakes every minute and sends each person's closing-prices
-# DM shortly after the market closes. --send means real Bluesky DMs (without
-# it, it would only print them). Installed by setup_market_server.sh.
+# DM shortly after the market closes, plus the daily public post. --send
+# means real Bluesky DMs and --post a real public post (without them, both
+# are only printed). Installed by setup_market_server.sh.
 [Unit]
 Description=marketcrawl scheduler (after-close DMs)
 After=network-online.target
@@ -15,7 +16,7 @@ EnvironmentFile=/home/marketcrawl/.env
 Environment=DATABASE_PATH=/home/marketcrawl/marketcrawl.db
 Environment=SPORTSCRAWL_ENV_FILE=/home/marketcrawl/.env
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/home/marketcrawl/app/.venv/bin/python run_market.py --send
+ExecStart=/home/marketcrawl/app/.venv/bin/python run_market.py --send --post
 # If it crashes, or its own watchdog (watchdog.py) kills it for being stuck,
 # start it again.
 Restart=always

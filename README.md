@@ -20,13 +20,15 @@ AAPL earnings release (8-K) https://www.sec.gov/Archives/edgar/data/...
 all-time high close, 🕳️ the lowest close in a year, 🔊 twice the usual
 trading volume.
 
-DM it `add AAPL`, `remove AAPL`, `list`, `about` or `help`. It sends nothing
-on weekends and market holidays.
+DM it `add AAPL`, `remove AAPL`, `list`, `test` (your message now, from the
+latest close), `quote AAPL` (the price right now, in market hours), `about`
+or `help`. It sends nothing on weekends and market holidays.
 
-It also writes one short public post per trading day: the three big indexes
-and the three biggest swings in company value (so Nvidia falling 4%, about
-$200 billion, outranks a small company doubling). (For now that's a dry run, printed rather than
-posted; `python feed.py preview` shows today's.)
+It also writes one short public post per trading day on
+[@marketcrawl.bsky.social](https://bsky.app/profile/marketcrawl.bsky.social):
+the three big indexes and the five biggest swings in company value (so
+Nvidia falling 4%, about $200 billion, outranks a small company doubling).
+`python feed.py preview` shows today's.
 
 ## Built on SportsCrawl
 
@@ -43,8 +45,8 @@ formatter and the ticker commands, in new files next to the originals. The
 original's spec is in `sportscrawl-spec.md`, and it's worth reading: it's a
 model of how to think through a small service before building it.
 
-**Status:** working locally, printing to the terminal or sending test DMs;
-not yet deployed.
+**Status:** live. DM [@marketcrawl.bsky.social](https://bsky.app/profile/marketcrawl.bsky.social)
+`help` to try it.
 
 - [How it works, explained simply](docs/HOW-IT-WORKS.md), including how to run it
 - License: MIT, same as the original (see `LICENSE`)

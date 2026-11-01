@@ -9,7 +9,7 @@ would say without sending anything.
     python feed.py enable      run_market.py will write it every trading day
     python feed.py disable     stop
 
-For now every post is a DRY RUN: run_market.py prints it instead of posting.
+It is a DRY RUN (printed, not posted) unless run_market.py is given --post.
 """
 
 from __future__ import annotations

@@ -355,3 +355,93 @@ def test_a_huge_remove_still_fits_in_one_reply(bot):
 
 def test_dots_alone_are_not_a_symbol(bot):
     assert "doesn't look like a symbol" in bot("add ..")
+
+
+# -- quote: the price right now, during market hours ---------------------------
+
+from sportscrawl.market_commands import (  # noqa: E402
+    MAX_QUOTE_SYMBOLS, QUOTE_COOLDOWN, QUOTE_HOURLY_SYMBOLS, Ration)
+
+MONDAY_2PM = datetime(2026, 11, 2, 19, 31, tzinfo=timezone.utc)  # 2:31pm New York
+SATURDAY = datetime(2026, 10, 31, 16, 0, tzinfo=timezone.utc)
+
+
+def live_prices(calls=None):
+    def live(symbols, now):
+        if calls is not None:
+            calls.append(list(symbols))
+        return [(Quote(symbol=s, name=KNOWN.get(s, s), is_index=s.startswith("^"),
+                       close=102.0, prev_close=100.0, close_date=now.date()), now)
+                for s in symbols if s in KNOWN]
+    return live
+
+
+def quoter(db, live):
+    handler = MarketCommandHandler(db, PEPPER, lookup=fake_lookup, live=live)
+
+    def say(text, now=MONDAY_2PM, did=DID):
+        return handler.handle(Message(message_id="m", convo_id="c-" + did, sender_did=did,
+                                      text=text, sent_at=""), now)
+    return say
+
+
+def test_quote_during_market_hours(db):
+    reply = quoter(db, live_prices())("quote AAPL sp500")
+    assert reply.startswith("Prices at 2:31pm ET\n\n")
+    # Index first, then stocks, same lines as the after-close message.
+    assert reply.index("S&P 500") < reply.index("AAPL 102.00 +2.00%")
+
+
+def test_quote_alone_means_my_list(db):
+    calls = []
+    bot = quoter(db, live_prices(calls))
+    bot("add AAPL MSFT")
+    bot("quote")
+    assert calls == [["AAPL", "MSFT"]]
+
+
+def test_quote_when_the_market_is_closed(db):
+    calls = []
+    reply = quoter(db, live_prices(calls))("quote AAPL", SATURDAY)
+    assert reply.startswith("The market's closed.")
+    assert "Next open: Mon Nov 2, 9:30am ET." in reply
+    assert calls == []
+
+
+def test_quote_names_what_it_could_not_find(db):
+    reply = quoter(db, live_prices())("quote AAPL NOPE")
+    assert reply.endswith("Couldn't find: NOPE")
+
+
+def test_quote_reads_at_most_five_symbols(db):
+    calls = []
+    quoter(db, live_prices(calls))("quote AAPL MSFT BRK-B SHOP.TO ^GSPC S001 S002")
+    assert len(calls[0]) == MAX_QUOTE_SYMBOLS
+
+
+def test_quote_is_once_a_minute_per_person(db):
+    calls = []
+    bot = quoter(db, live_prices(calls))
+    bot("quote AAPL")
+    assert bot("quote AAPL", MONDAY_2PM + timedelta(seconds=20)) == \
+        "You can quote again in 40 sec."
+    assert len(calls) == 1
+    assert "Prices at" in bot("quote AAPL", MONDAY_2PM + QUOTE_COOLDOWN)
+
+
+def test_quote_shared_limit_counts_symbols():
+    ration = Ration(QUOTE_COOLDOWN, QUOTE_HOURLY_SYMBOLS)
+    for i in range(QUOTE_HOURLY_SYMBOLS // 5):
+        assert ration.take("p%d" % i, MONDAY_2PM, cost=5) is None
+    assert ration.take("late", MONDAY_2PM, cost=1) == ("busy", None)
+    assert ration.take("late", MONDAY_2PM + timedelta(hours=1), cost=1) is None
+
+
+def test_quote_when_yahoo_is_down(db):
+    def down(symbols, now):
+        raise FetchError("http 503")
+    assert quoter(db, down)("quote AAPL") == "Couldn't get prices right now. Try again later."
+
+
+def test_quote_refuses_junk(db):
+    assert "doesn't look like a symbol" in quoter(db, live_prices())("quote ..")

@@ -157,3 +157,17 @@ def test_thursday_was_a_record_for_apple_in_the_saved_month():
     assert mark_milestones(thursday, extremes(history, THURSDAY)).record_high
     friday = quote_for(history, FRIDAY)
     assert not mark_milestones(friday, extremes(history, FRIDAY)).record_high
+
+
+def test_live_quote_compares_with_the_day_before():
+    from datetime import datetime, timezone
+
+    from sportscrawl.yahoo import live_quote
+    bars = (Bar(day=date(2026, 10, 29), close=100.0, volume=None),
+            Bar(day=date(2026, 10, 30), close=101.0, volume=None))
+    h = History(symbol="X", name="X", is_index=False, bars=bars,
+                market_time=datetime(2026, 10, 30, 18, 0, tzinfo=timezone.utc),
+                session_day=date(2026, 10, 30), session_end=None, price=103.0)
+    quote = live_quote(h, date(2026, 10, 30))
+    assert quote.close == 103.0 and quote.prev_close == 100.0
+    assert live_quote(h, date(2026, 10, 29)) is None  # nothing earlier to compare with

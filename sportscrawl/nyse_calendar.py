@@ -117,3 +117,20 @@ def new_york_date(when: datetime) -> date:
     market runs on New York's calendar, so that is the one that counts.
     """
     return when.astimezone(NEW_YORK).date()
+
+
+def is_open(when: datetime) -> bool:
+    """Is the market trading at this moment?"""
+    hours = session(new_york_date(when))
+    return hours is not None and hours[0] <= when < hours[1]
+
+
+def next_open(when: datetime) -> datetime:
+    """When the market next opens after `when` (UTC)."""
+    day = new_york_date(when)
+    for _ in range(10):  # never more than a long weekend plus a holiday
+        hours = session(day)
+        if hours is not None and when < hours[0]:
+            return hours[0]
+        day += timedelta(days=1)
+    raise CalendarExpired("no session found after %s" % when)

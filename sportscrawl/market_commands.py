@@ -33,8 +33,9 @@ from . import market_repo, repo
 from .commands import DELETE_PROMPT, STARTED, CommandHandler, normalize
 from .formatter import MAX_MESSAGE
 from .http import FetchError
-from .market_formatter import format_market_digest
+from .market_formatter import _line, _sort_key, format_market_digest
 from .models import Sub
+from .nyse_calendar import NEW_YORK, CalendarExpired, is_open, next_open
 from .yahoo import league_for
 
 log = logging.getLogger("sportscrawl.market_commands")
@@ -75,13 +76,18 @@ LIST_WORDS = frozenset({"list", "ls", "mine"})
 HELP_WORDS = frozenset({"help", "commands", "?"})
 ABOUT_WORDS = frozenset({"about", "credits", "source"})
 TEST_WORDS = frozenset({"test", "preview"})
+QUOTE_WORDS = frozenset({"quote", "q", "price"})
 
-# `test` downloads prices, so it's rationed. One person can ask once every
-# ten minutes (the answer can't change faster than that anyway: it's the
-# last close). And everyone together gets at most 30 an hour, so a crowd of
-# accounts can't use the bot to hammer Yahoo or flood replies.
+# `test` and `quote` download prices, so they're rationed (see Ration).
+# test: once per person every ten minutes (the answer can't change faster
+# than that anyway: it's the last close), 30 an hour for everyone together.
 TEST_COOLDOWN = timedelta(minutes=10)
 TEST_HOURLY_LIMIT = 30
+# quote: once a minute per person. The shared limit counts symbols, not
+# messages, because each symbol is a download: 600 an hour across everyone.
+QUOTE_COOLDOWN = timedelta(minutes=1)
+QUOTE_HOURLY_SYMBOLS = 600
+MAX_QUOTE_SYMBOLS = 5
 
 HELP = """MarketCrawl sends one message after the US stock market closes, with the closing prices of the symbols you follow, plus any earnings releases and quarterly or annual reports they filed.
 
@@ -89,6 +95,7 @@ add AAPL - follow a symbol (or several: add AAPL MSFT)
 remove AAPL - stop following one
 list - what you follow
 test - get your message now (latest close)
+quote AAPL - price right now (market hours; quote alone = your list)
 stop - pause messages
 start - resume messages
 delete - remove all your data
@@ -117,7 +124,7 @@ ADDED_OUTRO = "You'll get closing prices after each market close. Send 'test' to
 # A repeat unknown message inside the hour gets this instead of the full
 # help. The original project's reason, kept: a full reply to every message
 # from another bot is an endless loop.
-NUDGE = "Commands: add, remove, list, test, stop, help"
+NUDGE = "Commands: add, remove, list, test, quote, stop, help"
 HELP_THROTTLE = timedelta(hours=1)
 
 PRIVACY = """We keep: your Bluesky ID, the symbols you follow, and when you were last sent a message. Messages you send are read for commands and not stored. delete removes everything."""
@@ -132,6 +139,58 @@ Send: delete confirm
 If you only want the messages to stop, send stop instead. That keeps your symbols.""",
     STARTED: "Messages resumed. Your next one arrives after the next market close.",
 }
+
+
+class Ration:
+    """A simple fairness rule for commands that cost a download.
+
+    ELI5: like a playground slide. Each person has to wait their turn
+    (`cooldown`) before going again, and there's a limit on how many turns
+    everyone together gets in an hour (`hourly`), so a crowd of accounts
+    can't use the bot to hammer Yahoo or flood replies. Some turns cost more
+    than one (a quote of five symbols costs five).
+
+    Kept in memory, not the database: a restart forgetting it only means
+    someone may go a little early, which is harmless.
+    """
+
+    def __init__(self, cooldown: timedelta, hourly: int):
+        self._cooldown = cooldown
+        self._hourly = hourly
+        self._last = {}  # person -> when they last went
+        self._recent = deque()  # (when, cost) for the last hour, everyone
+
+    def take(self, who, now: datetime, cost: int = 1):
+        """None if they may go (and counts it), otherwise why not:
+        ("wait", timedelta) or ("busy", None)."""
+        last = self._last.get(who)
+        if last is not None and now - last < self._cooldown:
+            return "wait", self._cooldown - (now - last)
+        while self._recent and now - self._recent[0][0] >= timedelta(hours=1):
+            self._recent.popleft()
+        if sum(c for _, c in self._recent) + cost > self._hourly:
+            return "busy", None
+        # Counted before the download, so a failed one still uses a turn.
+        self._last[who] = now
+        self._recent.append((now, cost))
+        # Forget anyone whose wait is long over, so this never grows.
+        for old in [w for w, t in self._last.items() if now - t >= self._cooldown]:
+            del self._last[old]
+        return None
+
+
+def _wait_text(wait: timedelta) -> str:
+    seconds = int(wait.total_seconds())
+    if seconds < 60:
+        return "%d sec" % max(1, seconds)
+    return "%d min" % -(-seconds // 60)  # round up
+
+
+def _time_text(when: datetime) -> str:
+    """'2:31pm ET'."""
+    local = when.astimezone(NEW_YORK)
+    return "%d:%02d%s ET" % ((local.hour - 1) % 12 + 1, local.minute,
+                             "am" if local.hour < 12 else "pm")
 
 
 def clean_symbol(word: str) -> str:
@@ -158,7 +217,7 @@ def parse(text: str):
 
 class MarketCommandHandler(CommandHandler):
     def __init__(self, connection, pepper, lookup, base_url="https://localhost",
-                 latest=None):
+                 latest=None, live=None):
         # base_url only matters to commands we don't use (the web config
         # link), but the original constructor wants one.
         super().__init__(connection, pepper, base_url)
@@ -169,11 +228,11 @@ class MarketCommandHandler(CommandHandler):
         # latest(symbols, now) -> the last finished close for each, for
         # `test`. Optional: without it, `test` says prices are unavailable.
         self._latest = latest
-        # When each person last ran `test`, and when anyone did in the last
-        # hour. Kept in memory, not the database: a restart forgetting them
-        # only means someone may test a little early, which is harmless.
-        self._last_test = {}
-        self._recent_tests = deque()
+        # live(symbols, now) -> [(quote, time of last trade)], for `quote`.
+        # Optional: without it, `quote` says prices are unavailable.
+        self._live = live
+        self._tests = Ration(TEST_COOLDOWN, TEST_HOURLY_LIMIT)
+        self._quotes = Ration(QUOTE_COOLDOWN, QUOTE_HOURLY_SYMBOLS)
 
     def handle(self, message, now: datetime) -> str:
         did = message.sender_did
@@ -198,6 +257,8 @@ class MarketCommandHandler(CommandHandler):
                 return self._list(did)
             if kind == "test":
                 return self._test(did, now)
+            if kind == "quote":
+                return self._quote(did, symbols, now)
             if kind == "privacy":
                 return PRIVACY
             if kind == "about":
@@ -307,24 +368,12 @@ class MarketCommandHandler(CommandHandler):
         if not symbols:
             return "You're not following anything yet. Try: add AAPL"
 
-        last = self._last_test.get(did)
-        if last is not None and now - last < TEST_COOLDOWN:
-            wait = TEST_COOLDOWN - (now - last)
-            minutes = max(1, -(-int(wait.total_seconds()) // 60))  # round up
-            return "You can test again in %d min." % minutes
-
-        # Forget tests older than an hour, then check the shared limit.
-        while self._recent_tests and now - self._recent_tests[0] >= timedelta(hours=1):
-            self._recent_tests.popleft()
-        if len(self._recent_tests) >= TEST_HOURLY_LIMIT:
+        refused = self._tests.take(did, now)
+        if refused:
+            reason, wait = refused
+            if reason == "wait":
+                return "You can test again in %s." % _wait_text(wait)
             return "Lots of tests right now. Try again in a little while."
-
-        # Count it before fetching, so a failed fetch still uses up a turn.
-        self._last_test[did] = now
-        self._recent_tests.append(now)
-        # Tidy up anyone whose cooldown is long over, so this never grows.
-        for old in [d for d, t in self._last_test.items() if now - t >= TEST_COOLDOWN]:
-            del self._last_test[old]
 
         try:
             report = self._latest_report(symbols, now)
@@ -333,6 +382,50 @@ class MarketCommandHandler(CommandHandler):
         if report is None or len(report) > MAX_MESSAGE:
             return "Couldn't get prices right now. Try again later."
         return report
+
+    def _quote(self, did, symbols, now) -> str:
+        """Prices right now, during market hours only. `quote` on its own
+        means "everything I follow"."""
+        if not is_open(now):
+            try:
+                opens = "Next open: %s, %s." % (
+                    next_open(now).astimezone(NEW_YORK).strftime("%a %b %-d"),
+                    _time_text(next_open(now)))
+            except CalendarExpired:
+                opens = ""
+            return ("The market's closed. Quotes work 9:30am-4pm New York time on trading "
+                    "days. %s Send 'test' for the latest close." % opens).replace("  ", " ")
+
+        if not symbols:
+            symbols = market_repo.tickers_for(self._db, did)
+            if not symbols:
+                return "Which symbol? For example: quote AAPL"
+        else:
+            symbols = list(dict.fromkeys(symbols))[:MAX_QUOTE_SYMBOLS]
+            bad = [s for s in symbols if not SYMBOL.match(s)]
+            if bad:
+                return "%s doesn't look like a symbol." % _echo(bad[0])
+
+        refused = self._quotes.take(did, now, cost=len(symbols))
+        if refused:
+            reason, wait = refused
+            if reason == "wait":
+                return "You can quote again in %s." % _wait_text(wait)
+            return "Lots of quotes right now. Try again in a little while."
+
+        try:
+            found = self._live(symbols, now) if self._live else []
+        except FetchError:
+            found = []
+        if not found:
+            return "Couldn't get prices right now. Try again later."
+        quotes = sorted((q for q, _ in found), key=_sort_key)
+        as_of = max(t for _, t in found)
+        lines = ["Prices at %s" % _time_text(as_of), ""] + [_line(q) for q in quotes]
+        missing = [s for s in symbols if s not in {q.symbol for q in quotes}]
+        if missing:
+            lines += ["", "Couldn't find: %s" % " ".join(_echo(s) for s in missing)]
+        return _fit("\n".join(lines))
 
     def _latest_report(self, symbols, now):
         """The message for the last finished close, whatever the hour: at
@@ -391,7 +484,8 @@ def _kind(verb: str) -> str:
         return verb
     for name, words in (("add", ADD_WORDS), ("remove", REMOVE_WORDS),
                         ("list", LIST_WORDS), ("help", HELP_WORDS),
-                        ("about", ABOUT_WORDS), ("test", TEST_WORDS)):
+                        ("about", ABOUT_WORDS), ("test", TEST_WORDS),
+                        ("quote", QUOTE_WORDS)):
         if verb in words:
             return name
     return "unknown"

@@ -41,7 +41,8 @@ def main(argv=None) -> int:
     now = datetime.now(timezone.utc)
     prices = YahooSource()
     handler = MarketCommandHandler(open_database(args.database), pepper,
-                                   lookup=prices.lookup, latest=prices.latest)
+                                   lookup=prices.lookup, latest=prices.latest,
+                                   live=prices.live)
     message = Message(message_id="dev", convo_id="dev-" + args.did,
                       sender_did=args.did, text=args.text, sent_at="")
     print(handler.handle(message, now))
