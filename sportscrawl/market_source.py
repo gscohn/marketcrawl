@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 
 from .http import FetchError, Fetcher
 from .market_schedule import filing_window
-from .nyse_calendar import new_york_date
+from .nyse_calendar import is_open, new_york_date
 from .source import LeagueHealth, WindowResult
 from .yahoo import (SCREENS, ParseError, chart_url, extremes, full_history_url,
                     latest_quote, live_quote, mark_milestones, parse_chart, parse_screener,
@@ -153,7 +153,10 @@ class YahooSource:
 
     def live(self, symbols, now: datetime) -> list:
         """(quote, time of the last trade) for each symbol, for the `quote`
-        command. Symbols Yahoo doesn't know or can't give are left out."""
+        command: the price now while the market's open, otherwise the last
+        finished close. Symbols Yahoo doesn't know or can't give are left
+        out."""
+        trading = is_open(now)
         found = []
         for symbol in symbols:
             cached = self._charts.get(symbol)
@@ -163,7 +166,8 @@ class YahooSource:
                 history = self.history(symbol, now)
             except (FetchError, ParseError):
                 continue
-            quote = live_quote(history, new_york_date(now))
+            quote = (live_quote(history, new_york_date(now)) if trading
+                     else latest_quote(history))
             if quote is not None:
                 found.append((quote, history.market_time))
         return found

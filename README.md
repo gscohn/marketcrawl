@@ -21,7 +21,8 @@ all-time high close, 🕳️ the lowest close in a year, 🔊 twice the usual
 trading volume.
 
 DM it `add AAPL`, `remove AAPL`, `list`, `test` (your message now, from the
-latest close), `quote AAPL` (the price right now, in market hours), `about`
+latest close), `quote AAPL` (the price right now, or the last close when the market's
+shut; `quote` alone for everything you follow), `about`
 or `help`. It sends nothing on weekends and market holidays.
 
 It also writes one short public post per trading day on

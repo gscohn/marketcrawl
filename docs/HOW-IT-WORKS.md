@@ -126,7 +126,8 @@ Bluesky.
   minutes, and 30 an hour for everyone together, because each one downloads
   prices.
 - `quote AAPL` (or `quote` alone, for everything you follow) answers with
-  the price right now, during market hours only. Also rationed: once a
+  the price right now while the market's open, and the last close when
+  it's shut (after-hours trading isn't included). Also rationed: once a
   minute per person, at most 5 symbols, and 600 symbols an hour for
   everyone together. Prices are cached for 30 seconds, so many people
   asking about the same stock cost one download.

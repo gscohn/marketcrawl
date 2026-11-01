@@ -35,7 +35,8 @@ from .formatter import MAX_MESSAGE
 from .http import FetchError
 from .market_formatter import _line, _sort_key, format_market_digest
 from .models import Sub
-from .nyse_calendar import NEW_YORK, CalendarExpired, is_open, next_open
+from .formatter import _header
+from .nyse_calendar import NEW_YORK, is_open
 from .yahoo import league_for
 
 log = logging.getLogger("sportscrawl.market_commands")
@@ -95,7 +96,8 @@ add AAPL - follow a symbol (or several: add AAPL MSFT)
 remove AAPL - stop following one
 list - what you follow
 test - get your message now (latest close)
-quote AAPL - price right now (market hours; quote alone = your list)
+quote - prices now for everything you follow
+quote AAPL - price now for one (or several: quote AAPL MSFT)
 stop - pause messages
 start - resume messages
 delete - remove all your data
@@ -384,18 +386,8 @@ class MarketCommandHandler(CommandHandler):
         return report
 
     def _quote(self, did, symbols, now) -> str:
-        """Prices right now, during market hours only. `quote` on its own
-        means "everything I follow"."""
-        if not is_open(now):
-            try:
-                opens = "Next open: %s, %s." % (
-                    next_open(now).astimezone(NEW_YORK).strftime("%a %b %-d"),
-                    _time_text(next_open(now)))
-            except CalendarExpired:
-                opens = ""
-            return ("The market's closed. Quotes work 9:30am-4pm New York time on trading "
-                    "days. %s Send 'test' for the latest close." % opens).replace("  ", " ")
-
+        """Prices right now while the market's open; the last close when
+        it's shut. `quote` on its own means "everything I follow"."""
         if not symbols:
             symbols = market_repo.tickers_for(self._db, did)
             if not symbols:
@@ -420,8 +412,11 @@ class MarketCommandHandler(CommandHandler):
         if not found:
             return "Couldn't get prices right now. Try again later."
         quotes = sorted((q for q, _ in found), key=_sort_key)
-        as_of = max(t for _, t in found)
-        lines = ["Prices at %s" % _time_text(as_of), ""] + [_line(q) for q in quotes]
+        if is_open(now):
+            header = "Prices at %s" % _time_text(max(t for _, t in found))
+        else:
+            header = "%s close" % _header(max(q.close_date for q in quotes))
+        lines = [header, ""] + [_line(q) for q in quotes]
         missing = [s for s in symbols if s not in {q.symbol for q in quotes}]
         if missing:
             lines += ["", "Couldn't find: %s" % " ".join(_echo(s) for s in missing)]

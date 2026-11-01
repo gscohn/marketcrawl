@@ -400,12 +400,10 @@ def test_quote_alone_means_my_list(db):
     assert calls == [["AAPL", "MSFT"]]
 
 
-def test_quote_when_the_market_is_closed(db):
-    calls = []
-    reply = quoter(db, live_prices(calls))("quote AAPL", SATURDAY)
-    assert reply.startswith("The market's closed.")
-    assert "Next open: Mon Nov 2, 9:30am ET." in reply
-    assert calls == []
+def test_quote_when_the_market_is_closed_gives_the_close(db):
+    reply = quoter(db, live_prices())("quote AAPL", SATURDAY)
+    assert reply.startswith("Sat Oct 31 close\n\n")  # the fake's close_date is "today"
+    assert "AAPL 102.00 +2.00%" in reply
 
 
 def test_quote_names_what_it_could_not_find(db):
