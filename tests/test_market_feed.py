@@ -9,7 +9,8 @@ from pathlib import Path
 from sportscrawl import market_feed
 from sportscrawl.db import connect, migrate
 from sportscrawl.market_feed import (CALL_TO_ACTION, FEED_DID, POST_LIMIT, FeedRouter,
-                                     _dollars, format_feed_post, format_for, top_movers)
+                                     _dollars, display_name, format_feed_post, format_for,
+                                     short_name, top_movers)
 from sportscrawl.market_repo import ticker_leagues
 from sportscrawl.models import Sub
 from sportscrawl.yahoo import Mover, Quote, parse_screener
@@ -69,17 +70,44 @@ def test_the_whole_post():
     text = format_feed_post(INDEXES + movers(), FRIDAY).text
     assert text == (
         "Fri Oct 30 close\n"
-        "\N{CHART WITH DOWNWARDS TREND} S&P 500 -1.82%  "
-        "\N{COLLISION SYMBOL} Nasdaq -2.86%  "
+        "\N{CHART WITH DOWNWARDS TREND} S&P 500 -1.82%\n"
+        "\N{COLLISION SYMBOL} Nasdaq -2.86%\n"
         "\N{CHART WITH DOWNWARDS TREND} Dow -1.09%\n"
         "\n"
         "Biggest swings in company value\n"
-        "\N{CHART WITH DOWNWARDS TREND} $NVDA -4.2% (-$218B)\n"
-        "\N{COLLISION SYMBOL} $INTC -28.6% (-$140B)\n"
-        "\N{COLLISION SYMBOL} $TSM -5.9% (-$133B)\n"
+        "\N{CHART WITH DOWNWARDS TREND} $NVDA Nvidia -4.2% (-$218B)\n"
+        "\N{COLLISION SYMBOL} $INTC Intel -28.6% (-$140B)\n"
+        "\N{COLLISION SYMBOL} $TSM TSMC -5.9% (-$133B)\n"
+        "\N{COLLISION SYMBOL} $SPCX SpaceX -6.4% (-$125B)\n"
+        "\N{COLLISION SYMBOL} $AMD -10.9% (-$101B)\n"
         "\n" + CALL_TO_ACTION
     )
     assert len(text) <= POST_LIMIT
+
+
+def test_official_names_are_shortened():
+    assert short_name("NVIDIA Corporation") == "NVIDIA"
+    assert short_name("Meta Platforms, Inc.") == "Meta Platforms"
+    assert short_name("Advanced Micro Devices, Inc.") == "Advanced Micro"
+    assert short_name("Eli Lilly and Company") == "Eli Lilly"
+    assert short_name("Supercalifragilisticexpialidocious Ltd") == "Supercalifragi"
+
+
+def test_a_name_that_only_repeats_the_symbol_is_left_out():
+    amd = Mover(symbol="AMD", name="Advanced Micro Devices, Inc.", pct=-10.9,
+                market_cap=8e11, day=FRIDAY)
+    assert display_name(amd) == ""
+    other = Mover(symbol="ZZZ", name="Zed Holdings Inc.", pct=1, market_cap=1e9, day=FRIDAY)
+    assert display_name(other) == "Zed"
+
+
+def test_smallest_movers_are_dropped_until_it_fits():
+    long = [Mover(symbol="Z%d" % i, name="Longnamedcompany%d Inc." % i, pct=-9.9,
+                  market_cap=1e12 - i, day=FRIDAY) for i in range(5)]
+    digest = format_feed_post(INDEXES + long, FRIDAY)
+    assert digest.kind == "digest" and len(digest.text) <= POST_LIMIT
+    shown = [m.symbol for m in long if m.symbol + " " in digest.text]
+    assert 0 < len(shown) < 5 and shown == ["Z%d" % i for i in range(len(shown))]
 
 
 def test_no_index_prices_means_no_post_not_an_apology():

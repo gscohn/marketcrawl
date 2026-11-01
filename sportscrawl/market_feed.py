@@ -4,16 +4,24 @@ ELI5: besides the private DMs, the bot writes one public post per trading
 day, a few minutes after the close, for anyone scrolling past:
 
     Fri Oct 30 close
-    📉 S&P 500 -1.82%  💥 Nasdaq -2.86%  📉 Dow -1.09%
+    📉 S&P 500 -1.82%
+    💥 Nasdaq -2.86%
+    📉 Dow -1.09%
 
     Biggest swings in company value
-    📉 $NVDA -4.2% (-$209B)
-    💥 $TSM -5.9% (-$125B)
-    💥 $SPCX -6.4% (-$117B)
+    📉 $NVDA Nvidia -4.2% (-$218B)
+    💥 $INTC Intel -28.6% (-$140B)
+    💥 $TSM TSMC -5.9% (-$133B)
+    💥 $SPCX SpaceX -6.4% (-$125B)
+    💥 $AMD -10.9% (-$101B)
 
     DM me to get private stock updates daily
 
-Short on purpose: a glance in a feed, not a report. The movers are ranked
+Short on purpose: a glance in a feed, not a report. One thing per line,
+because on a phone a long line wraps somewhere unpredictable. Company
+names are the everyday ones ("TSMC", not "Taiwan Semiconductor
+Manufacturing Company Limited") so the post fits Bluesky's 300 characters; if it
+still doesn't fit, the smallest movers are dropped until it does. The movers are ranked
 by dollars of company value moved, not by percentage, so Nvidia falling 4%
 outranks an obscure company doubling. Symbols are written as cashtags
 ($NVDA), so the post turns up when people search Bluesky for that stock.
@@ -34,6 +42,8 @@ Public posts are, well, public, so two extra rules:
 
 from __future__ import annotations
 
+import re
+
 from . import market_repo, repo
 from .formatter import _header
 from .market_formatter import BIG_DOWN, BIG_MOVE_STOCK, BIG_UP, DOWN, UP, _arrow, format_market_digest
@@ -50,7 +60,28 @@ FEED_LEAGUE = "feed/public"
 
 # The indexes in the post, in this order, with short names to save space.
 FEED_INDEXES = (("^GSPC", "S&P 500"), ("^IXIC", "Nasdaq"), ("^DJI", "Dow"))
-TOP_MOVERS = 3
+TOP_MOVERS = 5
+
+# Company names longer than this get cut at a word boundary.
+NAME_CHARS = 14
+# What people actually call the companies that most often top the list.
+# Anything not here gets its official name shortened by short_name().
+EVERYDAY_NAMES = {
+    "AAPL": "Apple", "MSFT": "Microsoft", "NVDA": "Nvidia", "AMZN": "Amazon",
+    "GOOGL": "Alphabet", "GOOG": "Alphabet", "META": "Meta", "TSLA": "Tesla",
+    "AVGO": "Broadcom", "TSM": "TSMC", "BRK-A": "Berkshire", "BRK-B": "Berkshire",
+    "LLY": "Eli Lilly", "JPM": "JPMorgan", "V": "Visa", "MA": "Mastercard",
+    "WMT": "Walmart", "XOM": "Exxon", "UNH": "UnitedHealth", "ORCL": "Oracle",
+    "NFLX": "Netflix", "COST": "Costco", "PLTR": "Palantir", "SPCX": "SpaceX",
+    "JNJ": "J&J", "PG": "P&G", "HD": "Home Depot", "BAC": "BofA",
+    "KO": "Coca-Cola", "CRM": "Salesforce", "NVO": "Novo Nordisk",
+    "BABA": "Alibaba", "TM": "Toyota", "ASML": "ASML", "AMD": "AMD",
+    "INTC": "Intel", "MU": "Micron", "ABBV": "AbbVie", "CVX": "Chevron",
+}
+# Words that tell you what kind of company it is, not which one.
+_NAME_ENDINGS = re.compile(
+    r"[,.]?\s+(Inc|Incorporated|Corp|Corporation|Co|Company|Ltd|Limited|plc|PLC|"
+    r"Holdings?|Group|S\.?A|N\.?V|AG|SE|Class [A-Z])\.?$")
 
 # Bluesky's limit for a post (it counts characters as people see them, so
 # counting code points, which is what len() does, is on the safe side).
@@ -94,6 +125,37 @@ def _dollars(amount: float) -> str:
     return "%s$%.0fM" % (sign, amount / 1e6)
 
 
+# Don't end on a joining word ("Eli Lilly and").
+_JOINER_AT_END = re.compile(r"\s+(and|&|of|the)$", re.IGNORECASE)
+
+
+def short_name(name: str) -> str:
+    """'NVIDIA Corporation' -> 'NVIDIA'; 'Taiwan Semiconductor Manufacturing
+    Company Limited' -> 'Taiwan Semi'."""
+    previous = None
+    while previous != name:  # peel endings off one at a time
+        previous, name = name, _NAME_ENDINGS.sub("", name).strip(" ,")
+        name = _JOINER_AT_END.sub("", name)
+    if len(name) <= NAME_CHARS:
+        return name
+    kept = ""
+    for word in name.split():
+        trial = (kept + " " + word).strip()
+        if len(trial) > NAME_CHARS:
+            break
+        kept = trial
+    kept = _JOINER_AT_END.sub("", kept)
+    # A very long first word: cut it, so one name can't crowd out a mover.
+    return kept or name[:NAME_CHARS]
+
+
+def display_name(mover: Mover) -> str:
+    """The name to show after the symbol, or "" when it would only repeat
+    the symbol (AMD is just AMD)."""
+    name = EVERYDAY_NAMES.get(mover.symbol) or short_name(mover.name)
+    return "" if name.upper() == mover.symbol else name
+
+
 def _mover_line(mover: Mover) -> str:
     if mover.pct >= BIG_MOVE_STOCK:
         arrow = BIG_UP
@@ -101,7 +163,8 @@ def _mover_line(mover: Mover) -> str:
         arrow = BIG_DOWN
     else:
         arrow = UP if mover.pct > 0 else DOWN
-    return "%s %s %s%% (%s)" % (arrow, cashtag(mover.symbol), "{:+.1f}".format(mover.pct),
+    who = " ".join(filter(None, (cashtag(mover.symbol), display_name(mover))))
+    return "%s %s %s%% (%s)" % (arrow, who, "{:+.1f}".format(mover.pct),
                                 _dollars(mover.value_change))
 
 
@@ -137,14 +200,19 @@ def format_feed_post(events, day) -> Digest:
         return Digest(text=None, kind="silent")
 
     movers = top_movers(events, day)
-    lines = ["%s close" % _header(day), "  ".join(indexes)]
-    if movers:
-        lines += ["", "Biggest swings in company value"] + [_mover_line(m) for m in movers]
-    lines += ["", CALL_TO_ACTION]
-    text = "\n".join(lines)
-    if len(text) > POST_LIMIT:
-        return Digest(text=None, kind="silent")
-    return Digest(text=text, kind="digest")
+    # Drop the smallest movers until it fits; with none left and still too
+    # long (it never should be), skip the day rather than post it cut off.
+    while True:
+        lines = ["%s close" % _header(day)] + indexes
+        if movers:
+            lines += ["", "Biggest swings in company value"] + [_mover_line(m) for m in movers]
+        lines += ["", CALL_TO_ACTION]
+        text = "\n".join(lines)
+        if len(text) <= POST_LIMIT:
+            return Digest(text=text, kind="digest")
+        if not movers:
+            return Digest(text=None, kind="silent")
+        movers = movers[:-1]
 
 
 def format_for(events, subs, tz, now, failed_leagues=frozenset(), day=None):
