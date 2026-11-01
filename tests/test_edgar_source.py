@@ -76,3 +76,8 @@ def test_downloads_are_reused_for_a_few_minutes():
     edgar.filings(["AAPL"], *window, NOW)
     edgar.filings(["AAPL"], *window, NOW)
     assert transport.calls.count(SUBMISSIONS_URL % 320193) == 1
+
+
+def test_the_sec_header_is_just_a_name_and_the_contact():
+    # The SEC answered 403 when the header also carried a link.
+    assert user_agent(CONTACT) == "marketcrawl bot@example.com"

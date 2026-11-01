@@ -39,7 +39,10 @@ PAUSE_SECONDS = 0.15
 
 
 def user_agent(contact: str) -> str:
-    return "marketcrawl/0.1 (+https://github.com/gscohn/marketcrawl) %s" % contact
+    """Just a name and the contact email, the shape the SEC's own example
+    uses. Checked 2026-10-31: adding a "(+https://...)" link, as the Yahoo
+    header does, gets a 403 from the SEC."""
+    return "marketcrawl %s" % contact
 
 
 @dataclass
