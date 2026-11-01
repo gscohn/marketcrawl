@@ -47,8 +47,12 @@ def test_filings_are_picked_and_linked():
     assert filings[1].label == "earnings release (8-K)"
 
 
-def test_acceptance_time_is_new_york_time():
-    assert accepted_at("2026-10-29T16:31:05.000Z") == datetime(2026, 10, 29, 16, 31, 5,
+def test_acceptance_time_is_utc_shown_in_new_york_time():
+    # Apple's real Jul 30 earnings 8-K: 20:30:28Z on EDGAR, 16:30:28 on its filing page.
+    assert accepted_at("2026-07-30T20:30:28.000Z") == datetime(2026, 7, 30, 16, 30, 28,
+                                                               tzinfo=NEW_YORK)
+    # In winter New York is five hours behind, not four.
+    assert accepted_at("2026-01-29T21:30:00.000Z") == datetime(2026, 1, 29, 16, 30,
                                                                tzinfo=NEW_YORK)
 
 

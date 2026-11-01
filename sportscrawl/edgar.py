@@ -19,7 +19,7 @@ can feed in saved JSON.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .nyse_calendar import NEW_YORK
 from .yahoo import league_for
@@ -88,13 +88,13 @@ def is_interesting(form: str, items: str) -> bool:
 def accepted_at(stamp: str) -> datetime:
     """When the SEC accepted a filing.
 
-    EDGAR writes these like "2026-10-30T16:31:05.000Z". ASSUMPTION, to be
-    confirmed against live data: despite the "Z" (which normally means UTC),
-    the clock is New York time, the SEC's own. If that's wrong, every filing
-    shifts by four or five hours, and this is the only line to change.
+    EDGAR writes these like "2026-10-30T20:31:05.000Z": UTC, as the "Z"
+    says. Checked 2026-10-31 against the SEC's own filing pages, which show
+    the same moment in New York time (16:31:05). Turned into New York time
+    here, because that's the clock the market keeps.
     """
     naive = datetime.strptime(stamp[:19], "%Y-%m-%dT%H:%M:%S")
-    return naive.replace(tzinfo=NEW_YORK)
+    return naive.replace(tzinfo=timezone.utc).astimezone(NEW_YORK)
 
 
 def parse_submissions(payload: dict, symbol: str, cik: int) -> list:
