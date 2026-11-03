@@ -25,11 +25,42 @@ from .scheduler import DUE, EXPIRED, LATENESS_WINDOW, NOT_DUE, Candidate
 # can lag a little behind that. Fifteen minutes is comfortably past both.
 CLOSE_DELAY = timedelta(minutes=15)
 
+# The public earnings post waits longer. Most big companies put out their
+# results just after the bell (4:05, 4:30...), well after the price DMs have
+# gone, so waiting an hour and a quarter catches nearly all of them.
+EARNINGS_DELAY = timedelta(minutes=75)
 
-def due_time(day):
-    """When the message for this trading day is due, or None if no trading."""
+# The operator's daily summary comes last, once everything else for the day
+# (the DMs, the price post, the earnings post) has had its chance to go.
+REPORT_DELAY = timedelta(minutes=90)
+
+
+def due_time(day, delay=CLOSE_DELAY):
+    """When the message for this trading day is due, or None if no trading.
+    `delay` is how long after the closing bell (the DMs' 15 minutes unless
+    told otherwise)."""
     hours = session(day)
-    return hours[1] + CLOSE_DELAY if hours else None
+    return hours[1] + delay if hours else None
+
+
+def earnings_due(day):
+    return due_time(day, EARNINGS_DELAY)
+
+
+def report_due(day):
+    return due_time(day, REPORT_DELAY)
+
+
+def earnings_window(day):
+    """Which earnings releases belong in this day's public earnings post:
+    (start, end]. Same idea as filing_window below, on the earnings post's
+    later clock: from yesterday's post to today's, so a company that reports
+    before the open (7am, say) is in that evening's post, and one that
+    reports after the close is too."""
+    end = earnings_due(day)
+    if end is None:
+        return None
+    return earnings_due(previous_session_day(day)), end
 
 
 def filing_window(day):
@@ -47,8 +78,11 @@ def filing_window(day):
     return due_time(previous_session_day(day)), end
 
 
-def classify_market(row, now: datetime):
-    """Where a subscriber sits relative to today's market close."""
+def classify_market(row, now: datetime, due=due_time):
+    """Where a subscriber sits relative to today's market close.
+
+    `due` says when, given the day: the DMs' time unless told otherwise
+    (the public earnings post passes its own, later, time)."""
     day = new_york_date(now)
 
     # Already handled today's close for this person (sent, or decided there
@@ -56,7 +90,7 @@ def classify_market(row, now: datetime):
     if row["last_evaluated_date"] == day.isoformat():
         return NOT_DUE, None
 
-    due_at = due_time(day)
+    due_at = due(day)
     if due_at is None:
         # Weekend or holiday: there's no close, so there's no message. Not
         # an apology, not a "markets closed today" note; just quiet, the

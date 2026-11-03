@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -67,22 +68,28 @@ def test_dollars():
 
 
 def test_the_whole_post():
-    text = format_feed_post(INDEXES + movers(), FRIDAY).text
+    # The saved Yahoo lists predate prices being read, so give the movers some.
+    prices = {"NVDA": 201.34, "INTC": 24.1, "TSM": 281.5}
+    priced = [replace(m, price=prices.get(m.symbol, 100.0)) for m in movers()]
+    text = format_feed_post(INDEXES + priced, FRIDAY).text
     assert text == (
         "Fri Oct 30 close\n"
-        "\N{CHART WITH DOWNWARDS TREND} S&P 500 -1.82%\n"
-        "\N{COLLISION SYMBOL} Nasdaq -2.86%\n"
-        "\N{CHART WITH DOWNWARDS TREND} Dow -1.09%\n"
+        "\N{CHART WITH DOWNWARDS TREND} S&P 500 7,580.07 -1.82%\n"
+        "\N{COLLISION SYMBOL} Nasdaq 25,437.00 -2.86%\n"
+        "\N{CHART WITH DOWNWARDS TREND} Dow 51,770.31 -1.09%\n"
         "\n"
         "Biggest swings in company value\n"
-        "\N{CHART WITH DOWNWARDS TREND} $NVDA Nvidia -4.2% (-$218B)\n"
-        "\N{COLLISION SYMBOL} $INTC Intel -28.6% (-$140B)\n"
-        "\N{COLLISION SYMBOL} $TSM TSMC -5.9% (-$133B)\n"
-        "\N{COLLISION SYMBOL} $SPCX SpaceX -6.4% (-$125B)\n"
-        "\N{COLLISION SYMBOL} $AMD -10.9% (-$101B)\n"
+        "\N{CHART WITH DOWNWARDS TREND} $NVDA Nvidia 201.34 -4.2% (-$218B)\n"
+        "\N{COLLISION SYMBOL} $INTC Intel 24.10 -28.6% (-$140B)\n"
+        "\N{COLLISION SYMBOL} $TSM TSMC 281.50 -5.9% (-$133B)\n"
         "\n" + CALL_TO_ACTION
     )
     assert len(text) <= POST_LIMIT
+
+
+def test_a_mover_without_a_price_still_shows():
+    m = Mover(symbol="NVDA", name="NVIDIA Corporation", pct=-4.2, market_cap=5e12, day=FRIDAY)
+    assert "$NVDA Nvidia -4.2% (" in format_feed_post(INDEXES + [m], FRIDAY).text
 
 
 def test_official_names_are_shortened():
@@ -143,5 +150,7 @@ def test_enable_and_disable(tmp_path):
     market_feed.enable(db, NOW, "pepper")
     market_feed.enable(db, NOW, "pepper")  # twice is harmless
     assert ticker_leagues(db) == ["market/^DJI", "market/^GSPC", "market/^IXIC"]
+    assert db.execute("SELECT COUNT(*) FROM subscribers").fetchone()[0] == 2  # prices + earnings
     market_feed.disable(db, NOW, "pepper")
     assert ticker_leagues(db) == []
+    assert db.execute("SELECT COUNT(*) FROM subscribers").fetchone()[0] == 0

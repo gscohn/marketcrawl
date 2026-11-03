@@ -16,8 +16,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from .edgar import EARNINGS_FORM, MajorEarnings
 from .http import FetchError, Fetcher
-from .market_schedule import filing_window
+from .market_schedule import earnings_window, filing_window
 from .nyse_calendar import is_open, new_york_date
 from .source import LeagueHealth, WindowResult
 from .yahoo import (SCREENS, ParseError, chart_url, extremes, full_history_url,
@@ -35,6 +36,10 @@ LIVE_TTL = timedelta(seconds=30)
 # The full history (for record highs and 52-week lows) is big and only
 # matters up to yesterday, so it's downloaded about once a day.
 LONG_TTL = timedelta(hours=12)
+
+# A "major" company, for the public earnings post: worth this many dollars
+# or more. Roughly the 100 biggest US-listed companies.
+MAJOR_CAP = 100e9
 
 # Yahoo refuses known library names (python-requests, curl) with a 429 and
 # serves a plain product name. So we say who we are, honestly.
@@ -228,5 +233,34 @@ class MarketSource:
             symbols = [symbol_of(league) for league in leagues]
             result.events.extend(self._filings.filings(symbols, start, end, now))
         if self._movers:
-            result.events.extend(self._prices.movers(now))
+            movers = self._prices.movers(now)
+            result.events.extend(movers)
+            result.events.extend(self.major_earnings(movers, now))
         return result
+
+    def major_earnings(self, movers, now: datetime) -> list:
+        """Earnings releases from the biggest companies, for the public
+        earnings post.
+
+        Only looked up once the earnings post is due (an hour or so after
+        the close): before then the scheduler is only busy with the DMs and
+        the price post, and the SEC would be asked about 100 companies for
+        nothing. Like all filings, a problem here means fewer of them, never
+        a missing message.
+        """
+        day = new_york_date(now)
+        window = earnings_window(day) if self._filings else None
+        if window is None or now < window[1]:
+            return []
+        majors = {}
+        for mover in movers:
+            if mover.day == day and mover.market_cap >= MAJOR_CAP:
+                majors.setdefault(mover.symbol, mover)
+        start, end = window
+        found = []
+        for filing in self._filings.filings(list(majors), start, end, now):
+            if filing.form == EARNINGS_FORM:  # the release, not the 10-Q/10-K
+                company = majors[filing.symbol]
+                found.append(MajorEarnings(filing=filing, name=company.name,
+                                           market_cap=company.market_cap))
+        return found

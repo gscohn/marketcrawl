@@ -300,6 +300,9 @@ class Mover:
     pct: float
     market_cap: float  # the whole company's value, in dollars
     day: date  # the trading day this move happened on
+    # The share price at the close. None if Yahoo left it out; the post
+    # then just skips the price rather than leaving the mover out.
+    price: float | None = None
 
     @property
     def value_change(self) -> float:
@@ -334,6 +337,7 @@ def parse_screener(payload: dict) -> list:
                 pct=float(row["regularMarketChangePercent"]),
                 market_cap=float(row["marketCap"]),
                 day=_utc(row["regularMarketTime"]).astimezone(zone).date(),
+                price=float(row["regularMarketPrice"]) if row.get("regularMarketPrice") else None,
             ))
         return movers
     except (KeyError, IndexError, TypeError, ValueError) as exc:

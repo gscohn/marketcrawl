@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sportscrawl.market_post import BlueskyPoster, cashtag, cashtag_facets, post_record
+import pytest
+
+from sportscrawl.market_post import (POST_BREAK, BlueskyPoster, cashtag, cashtag_facets,
+                                     post_record, short_url)
 
 NOW = datetime(2026, 11, 2, 21, 20, tzinfo=timezone.utc)
 
@@ -55,3 +58,58 @@ def test_poster_publishes_the_record():
 
     BlueskyPoster(FakeClient(), clock=lambda: NOW)("$NVDA -4.2%")
     assert posted[0]["text"] == "$NVDA -4.2%"
+
+
+# -- links and threads --------------------------------------------------------
+
+SEC = "https://www.sec.gov/Archives/edgar/data/320193/000032019326000105/aapl-20260930.htm"
+
+
+def test_long_links_are_shortened_like_the_bluesky_app_does():
+    assert short_url(SEC) == "sec.gov/Archives/edg..."
+    assert short_url("https://example.com/") == "example.com"
+    assert short_url("https://example.com/short") == "example.com/short"
+
+
+def test_a_shortened_link_still_points_at_the_whole_address():
+    record = post_record("\N{ROCKET} $AAPL release " + SEC, NOW)
+    assert record["text"] == "\N{ROCKET} $AAPL release sec.gov/Archives/edg..."
+    link = [f for f in record["facets"] if f["features"][0]["$type"].endswith("#link")][0]
+    start, end = link["index"]["byteStart"], link["index"]["byteEnd"]
+    assert record["text"].encode("utf-8")[start:end] == b"sec.gov/Archives/edg..."
+    assert link["features"][0]["uri"] == SEC
+
+
+class ThreadClient:
+    def __init__(self, fail_on=None):
+        self.posted, self.fail_on = [], fail_on
+
+    def create_post(self, record):
+        if record["text"] == self.fail_on:
+            self.fail_on = None  # fails once, then works
+            raise RuntimeError("bluesky hiccup")
+        self.posted.append(record)
+        n = len(self.posted)
+        return {"uri": "at://bot/post/%d" % n, "cid": "cid%d" % n}
+
+
+def test_several_parts_become_a_thread():
+    client = ThreadClient()
+    BlueskyPoster(client, clock=lambda: NOW)(POST_BREAK.join(["one", "two", "three"]))
+    first, second, third = client.posted
+    assert "reply" not in first
+    assert second["reply"] == {"root": {"uri": "at://bot/post/1", "cid": "cid1"},
+                               "parent": {"uri": "at://bot/post/1", "cid": "cid1"}}
+    assert third["reply"]["root"]["uri"] == "at://bot/post/1"
+    assert third["reply"]["parent"]["uri"] == "at://bot/post/2"
+
+
+def test_a_thread_that_broke_halfway_carries_on_instead_of_repeating():
+    client = ThreadClient(fail_on="two")
+    poster = BlueskyPoster(client, clock=lambda: NOW)
+    text = POST_BREAK.join(["one", "two", "three"])
+    with pytest.raises(RuntimeError):
+        poster(text)
+    poster(text)  # the scheduler's retry a minute later
+    assert [r["text"] for r in client.posted] == ["one", "two", "three"]
+    assert client.posted[1]["reply"]["parent"]["uri"] == "at://bot/post/1"

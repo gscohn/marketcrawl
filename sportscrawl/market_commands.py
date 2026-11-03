@@ -251,7 +251,7 @@ class MarketCommandHandler(CommandHandler):
 
             if kind in ("add", "remove"):
                 reply = (self._add(did, symbols, now) if kind == "add"
-                         else self._remove(did, symbols))
+                         else self._remove(did, symbols, now))
                 if too_many:
                     reply += "\n(Only the first %d were read.)" % MAX_TICKERS
                 return _fit(reply)
@@ -356,6 +356,9 @@ class MarketCommandHandler(CommandHandler):
             # The scheduler skips anyone without a timezone, so the first
             # successful add is what switches delivery on.
             market_repo.ensure_market_tz(self._db, did)
+            # For the operator's daily summary: how many, never which.
+            repo.record_event(self._db, now, "ticker_add", did, self._pepper,
+                              detail={"count": added})
             lines.append("")
             lines.append(ADDED_OUTRO)
         return "\n".join(lines)
@@ -438,15 +441,21 @@ class MarketCommandHandler(CommandHandler):
             return None
         return digest.text
 
-    def _remove(self, did, symbols) -> str:
+    def _remove(self, did, symbols, now) -> str:
         if not symbols:
             return "Which symbol? For example: remove AAPL"
         lines = []
+        removed = 0
         for symbol in dict.fromkeys(symbols):
             if market_repo.remove_ticker(self._db, did, symbol):
                 lines.append("Removed %s." % symbol)
+                removed += 1
             else:
                 lines.append("You weren't following %s." % _echo(symbol))
+        if removed:
+            # For the operator's daily summary: how many, never which.
+            repo.record_event(self._db, now, "ticker_remove", did, self._pepper,
+                              detail={"count": removed})
         if not market_repo.tickers_for(self._db, did):
             lines.append("")
             lines.append("You're not following anything now, so no messages until you add one.")

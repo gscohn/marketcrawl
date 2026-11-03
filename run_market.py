@@ -13,9 +13,14 @@ this terminal", so you can watch it work without a Bluesky account.
     python run_market.py --once --at 2026-10-30T20:20:00Z
                                      pretend it's that moment (for testing)
 
-The daily public post (see market_feed.py) is switched on with
-`python feed.py enable`. It's a DRY RUN (printed, not posted) unless
---post is given, which publishes it on the bot's Bluesky profile.
+The daily public posts (prices, and on earnings days a second one about big
+companies' results; see market_feed.py) are switched on with
+`python feed.py enable`. They're a DRY RUN (printed, not posted) unless
+--post is given, which publishes them on the bot's Bluesky profile.
+
+If ADMIN_DID is set, that person gets a short summary DM 90 minutes after
+each close (posts sent, DMs sent, people joining and leaving; see
+market_report.py), and an alert if sending keeps failing.
 
 Filings from the SEC are included when SEC_CONTACT is set (the SEC requires
 an email address in every request; see edgar_source.py).
@@ -38,10 +43,10 @@ from sportscrawl.config import load_env_file, require, settings
 from sportscrawl.db import open_database
 from sportscrawl.edgar_source import EdgarSource
 from sportscrawl.logs import configure
-from sportscrawl.market_feed import FeedRouter, dry_run_poster, format_for
+from sportscrawl.market_feed import FeedRouter, classify_for, dry_run_poster, format_for
 from sportscrawl.market_post import BlueskyPoster, PostClient
 from sportscrawl.market_repo import ticker_leagues
-from sportscrawl.market_schedule import classify_market
+from sportscrawl.market_report import DailySummary
 from sportscrawl.market_source import MarketSource, YahooSource
 from sportscrawl.scheduler import Scheduler, stdout_sender
 from sportscrawl.senders import AllowlistSender, ChatSender
@@ -63,7 +68,7 @@ def default_source() -> MarketSource:
 
 
 def build(database_path: str, pepper: str, sender=None, source=None,
-          poster=dry_run_poster) -> Scheduler:
+          poster=dry_run_poster, admin_did=None) -> Scheduler:
     return Scheduler(
         connection=open_database(database_path),
         source=source or default_source(),
@@ -75,7 +80,10 @@ def build(database_path: str, pepper: str, sender=None, source=None,
         # --post); everyone else's message goes to `sender`.
         sender=FeedRouter(sender or stdout_sender, poster),
         formatter=format_for,
-        classifier=classify_market,
+        # The market clock, with the earnings post on its later one.
+        classifier=classify_for,
+        # The original's "sending keeps failing" alert, to the operator.
+        alert_did=admin_did,
     )
 
 
@@ -122,11 +130,20 @@ def main(argv=None) -> int:
         require(config, "BSKY_IDENTIFIER", "BSKY_APP_PASSWORD")
         poster = BlueskyPoster(PostClient(config["BSKY_IDENTIFIER"], config["BSKY_APP_PASSWORD"]))
 
-    scheduler = build(args.database, pepper, sender=sender, poster=poster)
+    admin_did = config.get("ADMIN_DID")
+    scheduler = build(args.database, pepper, sender=sender, poster=poster, admin_did=admin_did)
+    # The operator's daily summary. It shares the scheduler's database and
+    # DM sender, so without --send it's printed like everything else.
+    summary = DailySummary(open_database(args.database), pepper, admin_did,
+                           sender or stdout_sender, dry_run=not args.post,
+                           filings=bool(sec_contact()))
     while True:
         now = (datetime.fromisoformat(args.at.replace("Z", "+00:00")) if args.at
                else datetime.now(timezone.utc))
         report = scheduler.tick(now)
+        summary.count_errors(now, report.errors)
+        if summary.maybe_send(now):
+            print("operator summary sent", flush=True)
         print("[%s] %s" % (datetime.now(timezone.utc).strftime("%H:%M:%S"), report),
               flush=True)
         if args.once:

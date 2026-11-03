@@ -60,10 +60,11 @@ def main(argv=None) -> int:
     db = open_database(args.database)
     if args.action == "enable":
         market_feed.enable(db, now, pepper)
-        print("Public post on (dry run). run_market.py will write it after each close.")
+        print("Public posts on (prices, and earnings on days big companies report)."
+              " Dry run unless run_market.py has --post.")
     else:
         market_feed.disable(db, now, pepper)
-        print("Public post off.")
+        print("Public posts off.")
     return 0
 
 

@@ -31,6 +31,9 @@ ARCHIVES = "https://www.sec.gov/Archives/edgar/data"
 # say what kind of news. 2.02 is "Results of Operations and Financial
 # Condition", which in practice is the earnings press release.
 EARNINGS_ITEM = "2.02"
+# The form that carries it. Only 8-Ks with item 2.02 are kept (see
+# is_interesting), so an 8-K here always means an earnings release.
+EARNINGS_FORM = "8-K"
 
 # What we call each kind of filing in the message.
 LABELS = {
@@ -120,3 +123,19 @@ def parse_submissions(payload: dict, symbol: str, cik: int) -> list:
         return filings
     except (KeyError, TypeError, ValueError) as exc:
         raise ParseError("malformed filings for %s: %s" % (symbol, exc)) from exc
+
+
+@dataclass(frozen=True)
+class MajorEarnings:
+    """An earnings release from one of the market's biggest companies, for
+    the public earnings post.
+
+    ELI5: the same Filing the DMs use, wrapped with the company's name and
+    size so the post can say "Apple" and put the biggest companies first.
+    It's a different kind of thing on purpose: the DM writer only picks up
+    plain Filings, so these never sneak into anyone's private message.
+    """
+
+    filing: Filing
+    name: str
+    market_cap: float

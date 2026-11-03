@@ -7,8 +7,12 @@ the app does when you tap "Post". This file builds that record and sends it.
 Two parts, kept apart so the first can be tested without a network:
   - post_record(): the post itself, with "facets" (Bluesky's word for the
     marked-up bits of text). Bluesky only makes a $NVDA cashtag clickable
-    when the post says exactly which bytes of the text it covers.
-  - PostClient / BlueskyPoster: logs in and publishes it.
+    when the post says exactly which bytes of the text it covers. Long web
+    addresses are shortened on screen the way the Bluesky app does it
+    ("sec.gov/Archives/edg..."), with the full address kept in the link.
+  - PostClient / BlueskyPoster: logs in and publishes it. Text holding
+    POST_BREAK is several posts, published as a thread (each one a reply to
+    the one before), for days with more to say than one post holds.
 """
 
 from __future__ import annotations
@@ -16,7 +20,9 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from .chat import USER_AGENT, ChatClient, link_facets
+from urllib.parse import urlsplit
+
+from .chat import URL_PATTERN, USER_AGENT, ChatClient
 
 # The same rule Bluesky's own app uses to spot a cashtag (atproto's
 # rich-text code): a $, then a letter, then up to four letters or digits,
@@ -25,6 +31,10 @@ from .chat import USER_AGENT, ChatClient, link_facets
 # they stay plain symbols.
 CASHTAG = re.compile(r"(^|\s|\()(\$[A-Za-z][A-Za-z0-9]{0,4})(?=\s|$|[.,;:!?)\"'’])")
 _TICKER = re.compile(r"^[A-Z][A-Z0-9]{0,4}$")
+
+# Where one post ends and the next in the thread begins. An ASCII "record
+# separator" character: never in real text, so it can't split by accident.
+POST_BREAK = "\n\x1e\n"
 
 
 def cashtag(symbol: str) -> str:
@@ -46,17 +56,57 @@ def cashtag_facets(text: str) -> list:
     return facets
 
 
-def post_record(text: str, now: datetime) -> dict:
-    """The post, ready to publish."""
+def short_url(url: str) -> str:
+    """What a link looks like on screen, the way Bluesky's own app shows a
+    pasted one: the site plus the start of the path, then "...".
+    "https://www.sec.gov/Archives/edgar/data/320193/..." -> "sec.gov/Archives/edg...".
+    (The app keeps "www."; dropping it saves four characters a line.)"""
+    parts = urlsplit(url)
+    host = parts.netloc[4:] if parts.netloc.startswith("www.") else parts.netloc
+    path = "" if parts.path == "/" else parts.path
+    path += ("?" + parts.query if parts.query else "") + ("#" + parts.fragment if parts.fragment else "")
+    return host + (path[:13] + "..." if len(path) > 15 else path)
+
+
+def shorten_links(text: str):
+    """Swap each web address for its short form. Returns the new text and
+    the link facets that point each short form at the full address.
+    Offsets count bytes, as in cashtag_facets."""
+    out, facets, used = [], [], 0
+    for match in URL_PATTERN.finditer(text):
+        out.append(text[used: match.start()])
+        start = len("".join(out).encode("utf-8"))
+        shown = short_url(match.group(0))
+        out.append(shown)
+        facets.append({
+            "index": {"byteStart": start, "byteEnd": start + len(shown.encode("utf-8"))},
+            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": match.group(0)}],
+        })
+        used = match.end()
+    out.append(text[used:])
+    return "".join(out), facets
+
+
+def shown_length(text: str) -> int:
+    """How long a post will be once its links are shortened: the number
+    that has to stay under Bluesky's limit."""
+    return len(shorten_links(text)[0])
+
+
+def post_record(text: str, now: datetime, reply: dict | None = None) -> dict:
+    """The post, ready to publish. `reply` makes it part of a thread."""
+    text, link_facets = shorten_links(text)
     record = {
         "$type": "app.bsky.feed.post",
         "text": text,
         "createdAt": now.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
         "langs": ["en"],
     }
-    facets = cashtag_facets(text) + link_facets(text)
+    facets = cashtag_facets(text) + link_facets
     if facets:
         record["facets"] = facets
+    if reply:
+        record["reply"] = reply
     return record
 
 
@@ -86,7 +136,24 @@ class BlueskyPoster:
     def __init__(self, client: PostClient, clock=None):
         self._client = client
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._unfinished = None  # (text, next part, thread so far)
 
     def __call__(self, text: str) -> None:
-        reply = self._client.create_post(post_record(text, self._clock()))
-        print("--- public post published: %s\n%s" % (reply.get("uri"), text), flush=True)
+        parts = text.split(POST_BREAK)
+        # If a thread broke halfway last time (the scheduler then retries
+        # the whole text a minute later), carry on from where it stopped
+        # instead of posting the first part twice.
+        if self._unfinished and self._unfinished[0] == text:
+            _, done, thread = self._unfinished
+        else:
+            done, thread = 0, None
+        for number, part in enumerate(parts[done:], start=done):
+            self._unfinished = (text, number, thread)
+            published = self._client.create_post(post_record(part, self._clock(), thread))
+            print("--- public post published: %s\n%s" % (published.get("uri"), part), flush=True)
+            # The next part replies to this one. Bluesky wants both the
+            # first post of the thread (root) and the one being answered
+            # (parent), each by address (uri) and fingerprint (cid).
+            here = {"uri": published.get("uri"), "cid": published.get("cid")}
+            thread = {"root": thread["root"] if thread else here, "parent": here}
+        self._unfinished = None

@@ -443,3 +443,12 @@ def test_quote_when_yahoo_is_down(db):
 
 def test_quote_refuses_junk(db):
     assert "doesn't look like a symbol" in quoter(db, live_prices())("quote ..")
+
+
+def test_adds_and_removes_are_counted_never_named(bot, db):
+    bot("add AAPL MSFT")
+    bot("remove AAPL")
+    rows = db.execute("SELECT event_type, league, detail FROM events"
+                      " WHERE event_type LIKE 'ticker_%' ORDER BY id").fetchall()
+    assert [tuple(r) for r in rows] == [("ticker_add", None, '{"count": 2}'),
+                                        ("ticker_remove", None, '{"count": 1}')]

@@ -93,20 +93,61 @@ of it:
 - **Nothing to say means saying nothing.** Weekends and holidays send no
   message at all, not a "markets closed" note.
 
-### The public post
+### The public posts
 
 Once a day the bot also writes a short public post: how the S&P 500, Nasdaq
-and Dow did, the three biggest swings in company value, and an invitation to
-DM it. "Biggest swing" means the most dollars of company value gained or
-lost (market value × % change), not the biggest percentage: Amazon moving 2%
-is worth more attention than a tiny company doubling. Candidates come from
-Yahoo's lists of the 100 largest companies and the day's top gainers and
-losers. It's built as one more
-subscriber, a pretend one called the feed (`market_feed.py`), so it gets the
-mail room's once-a-day and retry rules for free. Only the writing (300
-characters max, never an apology in public) and the delivery (a post, not a
-DM) are different. `feed.py enable` switches it on; for now posts are a dry
-run, printed instead of posted.
+and Dow did (level and % change), the biggest swings in company value (with
+each company's closing price), and an invitation to DM it. "Biggest swing"
+means the most dollars of company value gained or lost (market value × %
+change), not the biggest percentage: Amazon moving 2% is worth more attention
+than a tiny company doubling. Candidates come from Yahoo's lists of the 100
+largest companies and the day's top gainers and losers. Bluesky allows 300
+characters, so the smallest swings are dropped until it fits (usually three
+or four are left). Symbols are cashtags ($NVDA), so the post shows up when
+people search for the stock.
+
+It's built as one more subscriber, a pretend one called the feed
+(`market_feed.py`), so it gets the mail room's once-a-day and retry rules
+for free. Only the writing (300 characters max, never an apology in public)
+and the delivery (a post, not a DM) are different.
+
+On days when big companies (worth $100B or more) put out results, a second
+post follows 75 minutes after the bell: one line per company, in the DMs'
+filings format with a cashtag added, biggest company first, e.g.
+`$AAPL Apple earnings release (8-K) sec.gov/Archives/edg...`. It waits that
+long because most companies report just after the close, after the price
+post has gone. It's a second pretend subscriber (the earnings feed) with its
+own, later, due time. Long SEC links are shortened on screen the way the
+Bluesky app does it, and a busy day becomes a short thread (up to four
+posts, then "+N more"). It needs SEC filings switched on (`SEC_CONTACT`).
+
+`feed.py enable` switches both on; without `run_market.py --post` they're
+a dry run, printed instead of posted.
+
+### The operator's daily summary
+
+If `ADMIN_DID` is set, whoever runs the bot gets one DM a day, 90 minutes
+after the bell, once all of the above has had its turn
+(`market_report.py`):
+
+```
+Mon Nov 2 summary
+Price post: sent
+Earnings post: none today (no big company reported)
+Close DMs: 12 sent, 0 not sent
+
+Since last summary
+New people: 3 (first DM)
+Left: 1 deleted, 0 paused
+Symbols: 7 added, 2 removed
+
+Now: 40 people following 85 symbols (2 paused)
+```
+
+Counts only, like the original's admin page: nothing in it names anyone.
+"Sent today" is written to the events table, so a restart doesn't send it
+twice. The same `ADMIN_DID` also gets the original's alert when sending
+keeps failing.
 
 ## The front desk
 
