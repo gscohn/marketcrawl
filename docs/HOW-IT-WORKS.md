@@ -96,14 +96,14 @@ of it:
 ### The public posts
 
 Once a day the bot also writes a short public post: how the S&P 500, Nasdaq
-and Dow did (level and % change), the biggest swings in company value (with
+and Dow did (% change), the biggest swings in company value (with
 each company's closing price), and an invitation to DM it. "Biggest swing"
 means the most dollars of company value gained or lost (market value × %
 change), not the biggest percentage: Amazon moving 2% is worth more attention
 than a tiny company doubling. Candidates come from Yahoo's lists of the 100
 largest companies and the day's top gainers and losers. Bluesky allows 300
-characters, so the smallest swings are dropped until it fits (usually three
-or four are left). Symbols are cashtags ($NVDA), so the post shows up when
+characters, so the smallest swings are dropped until it fits (usually four
+are left). Symbols are cashtags ($NVDA), so the post shows up when
 people search for the stock.
 
 It's built as one more subscriber, a pretend one called the feed

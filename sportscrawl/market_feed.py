@@ -4,9 +4,9 @@ ELI5: besides the private DMs, the bot writes one public post per trading
 day, a few minutes after the close, for anyone scrolling past:
 
     Fri Oct 30 close
-    📉 S&P 500 7,580.07 -1.82%
-    💥 Nasdaq 25,437.00 -2.86%
-    📉 Dow 51,770.31 -1.09%
+    📉 S&P 500 -1.82%
+    💥 Nasdaq -2.86%
+    📉 Dow -1.09%
 
     Biggest swings in company value
     📉 $NVDA Nvidia 201.34 -4.2% (-$218B)
@@ -20,7 +20,7 @@ because on a phone a long line wraps somewhere unpredictable. Company
 names are the everyday ones ("TSMC", not "Taiwan Semiconductor
 Manufacturing Company Limited") so the post fits Bluesky's 300 characters; if it
 still doesn't fit, the smallest movers are dropped until it does (with
-prices on every line, that's usually three or four of them). The movers are ranked
+a price on each mover, that's usually four of them). The movers are ranked
 by dollars of company value moved, not by percentage, so Nvidia falling 4%
 outranks an obscure company doubling. Symbols are written as cashtags
 ($NVDA), so the post turns up when people search Bluesky for that stock.
@@ -152,9 +152,9 @@ def classify_for(row, now):
 # -- writing the post ------------------------------------------------------
 
 def _index_part(quote: Quote, name: str) -> str:
-    # The level and the change, written the same way as in the DMs.
-    return "%s %s %s %s%%" % (_arrow(quote), name, "{:,.2f}".format(quote.close),
-                              "{:+.2f}".format(quote.pct))
+    # Just the percentage: an index's level ("7,541.40") means little at a
+    # glance, and leaving it out makes room for another mover.
+    return "%s %s %s%%" % (_arrow(quote), name, "{:+.2f}".format(quote.pct))
 
 
 def _dollars(amount: float) -> str:
